@@ -51,6 +51,8 @@ const ICONS = {
   drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+  minus: '<path d="M5 12h14"/>',
+  fitWidth: '<path d="M4 6v12M20 6v12M8 12h8M10.5 9.5 8 12l2.5 2.5M13.5 9.5 16 12l-2.5 2.5"/>',
   viewIcons: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
   viewList: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" stroke-width="2.6"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
@@ -1561,7 +1563,8 @@ function showViewer() {
     if (/\.heic$/i.test(file.path)) call('thumb', file.path, 2560).then(url => { if (url && isCurrent()) media.src = url })
     else media.src = fileUrl(file.path)
   } else if (/\.pdf$/i.test(file.path)) {
-    media = Object.assign(el('iframe', 'doc'), { src: fileUrl(file.path) })
+    media = el('div', 'pdf-view')
+    openPdf(media, file, isCurrent, viewerSignal())
   } else if (MESH_EXT.test(file.name)) {
     media = el('div', 'mesh-view')
     openMeshPreview(media, file, isCurrent)
@@ -1829,8 +1832,8 @@ function viewerKey(e) {
     closeViewer()
   }
   else if (e.key === 'Enter') call('open', file.path)
-  else if (e.key === '+' || e.key === '=') zoomBy(1.25)
-  else if (e.key === '-') zoomBy(0.8)
+  else if (e.key === '+' || e.key === '=') activePdf ? activePdf.zoomBy(1.2) : zoomBy(1.25)
+  else if (e.key === '-') activePdf ? activePdf.zoomBy(1 / 1.2) : zoomBy(0.8)
   else if (e.key.toLowerCase() === 'i') toggleInfo()
   else if (e.key.toLowerCase() === 'b' && TRANSPARENT_IMAGE.test(file.name)) {
     const i = MATTES.findIndex(([m]) => m === currentMatte())

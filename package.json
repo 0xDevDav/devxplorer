@@ -24,7 +24,10 @@
     "files": [
       "src/**/*",
       "assets/icon.png",
-      "package.json"
+      "package.json",
+      "!node_modules/pdfjs-dist/{legacy,types,web,image_decoders,iccs}/**",
+      "!node_modules/pdfjs-dist/**/*.map",
+      "!node_modules/pdfjs-dist/build/{pdf.mjs,pdf.worker.mjs,pdf.sandbox.mjs,pdf.sandbox.min.mjs}"
     ],
     "win": {
       "target": "nsis",
@@ -48,5 +51,8 @@
   "devDependencies": {
     "electron": "^44.6.0",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299"
   }
 }

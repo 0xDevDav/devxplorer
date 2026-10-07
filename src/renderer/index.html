@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src file: data:; media-src file:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file: 'wasm-unsafe-eval'; img-src file: data: blob:; media-src file:">
   <title>DevXplorer</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -145,6 +145,7 @@
   <script src="previewers.js"></script>
   <script src="mesh.js"></script>
   <script src="viewer3d.js"></script>
+  <script src="pdfviewer.js"></script>
   <script src="extensions/social.js"></script>
   <script src="extensions/tags.js"></script>
 </body>
