@@ -753,6 +753,7 @@ function groupSection(label, count, content) {
     collapsedGroups.has(id) ? collapsedGroups.delete(id) : collapsedGroups.add(id)
     store.set('collapsedGroups', [...collapsedGroups])
     apply()
+    itemIndex = null
   }
   apply()
   return [head, body]
@@ -924,8 +925,32 @@ function fileCard(file, siblings) {
 /* ========== selection ========== */
 
 const isShown = node => !node.closest('.group-body.collapsed')
-const visiblePaths = () => $$('#main [data-path]').filter(isShown).map(n => n.dataset.path)
-const selectedInOrder = () => [...new Set(visiblePaths().filter(p => state.selection.has(p)))]
+
+/*
+ * Index of the rendered items, so selection and the status bar do not rescan thousands of nodes on
+ * every click. It is rebuilt on first use after the DOM changed: any node added or removed under
+ * #main, or a group collapsed or expanded.
+ */
+let itemIndex = null
+// Previews swapping their image inside a card do not count, only items coming or going.
+const touchesItems = records => records.some(r => [...r.addedNodes, ...r.removedNodes]
+  .some(n => n.nodeType === 1 && (n.matches('[data-path]') || n.querySelector('[data-path]'))))
+const itemChanges = new MutationObserver(records => { if (touchesItems(records)) itemIndex = null })
+itemChanges.observe($('#main'), { childList: true, subtree: true })
+
+function renderedItems() {
+  if (touchesItems(itemChanges.takeRecords())) itemIndex = null
+  if (!itemIndex) {
+    const nodes = $$('#main [data-path]').filter(isShown)
+    const byPath = new Map()
+    for (const node of nodes) byPath.set(node.dataset.path, [...(byPath.get(node.dataset.path) || []), node])
+    itemIndex = { byPath, paths: [...new Set(nodes.map(n => n.dataset.path))], content: nodes.filter(n => n.closest('#content')) }
+  }
+  return itemIndex
+}
+
+const visiblePaths = () => renderedItems().paths
+const selectedInOrder = () => visiblePaths().filter(p => state.selection.has(p))
 
 function selectable(node, path, isFolder) {
   node.dataset.path = path
@@ -968,12 +993,13 @@ function clearSelection() {
   paintSelection()
 }
 
+// Only nodes whose state changes are touched: those painted last time and those to paint now.
 function paintSelection() {
-  const cut = new Set(clipboard?.cut ? clipboard.paths : [])
-  for (const node of $$('#main [data-path]')) {
-    node.classList.toggle('sel', state.selection.has(node.dataset.path))
-    node.classList.toggle('cut', cut.has(node.dataset.path))
-  }
+  const { byPath } = renderedItems()
+  const cut = clipboard?.cut ? clipboard.paths : []
+  for (const node of $$('#main .sel, #main .cut')) node.classList.remove('sel', 'cut')
+  for (const p of state.selection) byPath.get(p)?.forEach(node => node.classList.add('sel'))
+  for (const p of cut) byPath.get(p)?.forEach(node => node.classList.add('cut'))
   renderStatus()
 }
 
@@ -992,7 +1018,7 @@ let statusToken = 0
 async function renderStatus() {
   const token = ++statusToken
   const left = $('#statusLeft')
-  const parts = [t.n('count.items', $$('#content [data-path]').filter(isShown).length)]
+  const parts = [t.n('count.items', renderedItems().content.length)]
   const selected = selectedInOrder().map(p => state.items.get(p)).filter(Boolean)
   if (!selected.length) { left.textContent = parts.join(' · '); return }
 
@@ -1915,7 +1941,7 @@ function typeToSelect(char) {
   clearTimeout(typedTimer)
   typedTimer = setTimeout(() => { typed = '' }, 900)
   const nameOf = node => (node.entry?.name ?? baseName(node.dataset.path)).toLowerCase()
-  const content = $$('#content [data-path]').filter(isShown).find(n => nameOf(n).startsWith(typed))
+  const content = renderedItems().content.find(n => nameOf(n).startsWith(typed))
   if (content) {
     select(content.dataset.path, {})
     content.scrollIntoView({ block: 'nearest' })
@@ -2062,7 +2088,7 @@ function bindEvents() {
     else if (e.key === 'F2' && selected.length) renameSelection()
     else if (e.key === 'a' && e.ctrlKey) {
       e.preventDefault()
-      $$('#content [data-path]').filter(isShown).forEach(n => state.selection.add(n.dataset.path))
+      renderedItems().content.forEach(n => state.selection.add(n.dataset.path))
       paintSelection()
     } else if (e.key === 'Escape') clearSelection()
     else if (e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) typeToSelect(e.key)
