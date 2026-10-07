@@ -1875,6 +1875,7 @@ function bindEvents() {
   bindViewerZoom()
   bindPalette()
   bindSplitter()
+  bindTooltips()
   new ResizeObserver(() => requestAnimationFrame(fitCrumbs)).observe($('#toolbar'))
   document.addEventListener('wheel', e => {
     if (!e.ctrlKey || viewerOpen()) return
@@ -1949,6 +1950,56 @@ function resizeSection(section, step) {
   const from = index < 0 ? z.steps.length - 1 : index
   localStorage[z.key] = step === 0 ? z.fallback : z.steps[Math.max(0, Math.min(z.steps.length - 1, from + step))]
   applySizes()
+}
+
+/* ========== tooltips ========== */
+
+/*
+ * Native title tooltips look like Windows. On hover a title moves to data-tip and is shown in a
+ * macOS-style bubble near the pointer after a short rest; leaving, clicking, scrolling or typing
+ * hides it.
+ */
+const TOOLTIP_DELAY_MS = 550
+const TOOLTIP_OFFSET = 20
+let tipTarget = null
+let tipTimer = null
+let pointer = { x: 0, y: 0 }
+
+function hideTooltip() {
+  clearTimeout(tipTimer)
+  tipTarget = null
+  $('#tooltip').classList.remove('show')
+}
+
+function showTooltip(target) {
+  const tip = $('#tooltip')
+  if (!target.isConnected || !target.dataset.tip) return
+  tip.textContent = target.dataset.tip
+  tip.style.left = '0px'
+  tip.style.top = '0px'
+  const { width, height } = tip.getBoundingClientRect()
+  const below = pointer.y + TOOLTIP_OFFSET + height < innerHeight - 8
+  tip.style.left = Math.max(8, Math.min(pointer.x - 10, innerWidth - width - 8)) + 'px'
+  tip.style.top = (below ? pointer.y + TOOLTIP_OFFSET : pointer.y - height - 10) + 'px'
+  tip.classList.add('show')
+}
+
+function bindTooltips() {
+  document.addEventListener('pointermove', e => { pointer = { x: e.clientX, y: e.clientY } }, true)
+  document.addEventListener('pointerover', e => {
+    const target = e.target.closest?.('[title], [data-tip]')
+    if (!target) return
+    if (target.hasAttribute('title')) {
+      target.dataset.tip = target.title
+      target.removeAttribute('title')
+    }
+    if (target === tipTarget) return
+    hideTooltip()
+    tipTarget = target
+    tipTimer = setTimeout(() => showTooltip(target), TOOLTIP_DELAY_MS)
+  })
+  document.addEventListener('pointerout', e => { if (tipTarget && !tipTarget.contains(e.relatedTarget)) hideTooltip() })
+  for (const type of ['pointerdown', 'wheel', 'keydown', 'scroll']) document.addEventListener(type, hideTooltip, true)
 }
 
 /* ========== startup ========== */
