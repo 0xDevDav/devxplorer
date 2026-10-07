@@ -309,6 +309,19 @@ button:disabled { opacity: .5; cursor: default }
 .empty-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-soft) }
 .empty .hint { max-width: 380px }
 
+/* Get Info sheet */
+#infoSheet { width: 380px }
+.info-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line) }
+.info-preview { display: grid; place-items: center; flex: none; width: 64px; height: 64px }
+.info-preview img { max-width: 64px; max-height: 64px; border-radius: var(--r-sm); object-fit: contain }
+.info-preview .icon { width: 56px; height: 56px; color: var(--folder) }
+.info-preview .doc { width: 52px; height: 64px; background: none }
+.info-title { min-width: 0 }
+.info-title h3 { margin: 0 0 2px; font-size: 14px; overflow-wrap: anywhere; user-select: text }
+#infoBody dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; margin: 0; font-size: 12.5px }
+#infoBody dt { color: var(--muted); text-align: right }
+#infoBody dd { margin: 0; overflow-wrap: anywhere; user-select: text }
+
 /* Alert sheet: app icon, message and a single default button, like a macOS alert */
 #alert { width: 300px; padding: 22px 20px 16px; text-align: center }
 .alert-icon { width: 56px; height: 56px }

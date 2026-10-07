@@ -79,6 +79,7 @@ async function describe(p) {
     path: p,
     isDir: stat.isDirectory(),
     mtime: stat.mtimeMs,
+    created: stat.birthtimeMs,
     size: stat.isDirectory() ? 0 : stat.size,
     type: IMAGE_EXT.test(name) ? 'img' : VIDEO_EXT.test(name) ? 'video' : 'file',
     meta: await library.metaFor(p, stat).catch(() => null),

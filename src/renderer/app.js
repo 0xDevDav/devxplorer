@@ -420,6 +420,7 @@ const SHORTCUTS = [
     ['Ctrl+V', 'menu.paste'],
     ['Ctrl+D', 'menu.duplicate'],
     ['Ctrl+Shift+C', 'menu.copyPath'],
+    ['Ctrl+I', 'menu.info'],
     ['Alt+key.drag', 'keys.reorder'],
     ['Ctrl+Z', 'keys.undo'],
     ['Ctrl+A', 'keys.selectAll'],
@@ -1358,6 +1359,7 @@ function itemMenu(e) {
     '-',
     single && { label: t('menu.terminal'), run: () => call('openTerminal', folderOf(single, isFolder)) },
     hasVsCode && { label: t('menu.vscode'), run: () => call('openInVsCode', paths) },
+    { label: t('menu.info'), key: 'Ctrl+I', run: () => showItemInfo(paths) },
     single && { label: t('menu.reveal'), run: () => call('reveal', single) },
     isFolder && { label: isPinned(single) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(single) },
     '-',
@@ -1641,6 +1643,70 @@ function infoPanel(file, media) {
     row('info.exposure', exposureLabel(photo))
   })()
   return panel
+}
+
+/*
+ * "Get Info" sheet for the selection, like the Finder's: a preview, the name, then kind, size,
+ * location and dates; photos add their camera details. Several items show their count and total.
+ */
+async function showItemInfo(paths) {
+  if (!paths.length) return
+  const items = (await call('items', paths)) || []
+  if (!items.length) return
+  const sheet = $('#infoSheet')
+  const body = $('#infoBody')
+  const details = el('dl')
+  const row = (key, value) => { if (value) details.append(el('dt', '', t(key)), el('dd', '', value)) }
+  const single = items.length === 1 ? items[0] : null
+  const head = el('div', 'info-head')
+  const title = el('div', 'info-title')
+
+  if (single) {
+    const preview = el('div', 'info-preview')
+    if (single.isDir) preview.append(icon('folderFill', 'finder-folder'))
+    else if (single.type !== 'file') call('thumb', single.path, 256).then(url => { if (url) preview.append(Object.assign(el('img'), { src: url, alt: '' })) })
+    else if (docKind(single.name) === 'app') call('appIcon', single.path).then(url => { if (url) preview.append(Object.assign(el('img'), { src: url, alt: '' })) })
+    else preview.append(docIcon(single.name))
+    title.append(el('h3', '', single.name), el('p', 'hint', single.isDir ? t('info.folder') : t('info.kindFile', { ext: (extensionOf(single.name) || '—').toUpperCase() })))
+    head.append(preview, title)
+    row('info.where', parentDir(single.path))
+    row('info.created', single.created && dateTimeFormat.format(single.created))
+    row('info.modified', dateTimeFormat.format(single.mtime))
+  } else {
+    title.append(el('h3', '', t.n('count.items', items.length)))
+    head.append(title)
+  }
+
+  // Sizes of folders are computed on demand; the row fills in when ready.
+  const sizeValue = el('dd', '', t('status.computing'))
+  details.prepend(el('dt', '', t('info.size')), sizeValue)
+  const folders = items.filter(i => i.isDir)
+  Promise.all(folders.map(f => call('folderSize', f.path))).then(sizes => {
+    const total = items.filter(i => !i.isDir).reduce((sum, i) => sum + i.size, 0) + sizes.reduce((a, b) => a + (b || 0), 0)
+    sizeValue.textContent = formatBytes(total)
+  })
+  if (single?.isDir) list(single.path).then(data => {
+    details.append(el('dt', '', t('info.contains')), el('dd', '', countLabel(data)))
+  })
+
+  if (single?.type === 'img') {
+    const photo = (await call('photoInfo', single.path)) || {}
+    // Formats without EXIF (PNG, GIF, WebP…) give their size once decoded.
+    if (!photo.width && !/\.heic$/i.test(single.name)) {
+      const img = Object.assign(new Image(), { src: fileUrl(single.path) })
+      await img.decode().catch(() => {})
+      Object.assign(photo, { width: img.naturalWidth, height: img.naturalHeight })
+    }
+    const camera = photo.model && (photo.make && !photo.model.startsWith(photo.make) ? `${photo.make} ${photo.model}` : photo.model)
+    row('info.dimensions', photo.width && `${photo.width} × ${photo.height} px`)
+    row('info.taken', photo.taken && dateTimeFormat.format(photo.taken))
+    row('info.camera', camera)
+    row('info.lens', photo.lens)
+    row('info.exposure', exposureLabel(photo))
+  }
+
+  body.replaceChildren(head, details)
+  if (!sheet.open) sheet.showModal()
 }
 
 function toggleInfo() {
@@ -2200,6 +2266,7 @@ function bindEvents() {
     }
 
     if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette() }
+    if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); return showItemInfo(selectedInOrder()) }
     if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); return editPath() }
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
     if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); return closeTab(tabIndex) }
