@@ -754,12 +754,15 @@ async function treeNode(dir, name, depth) {
 }
 
 /*
- * Hovering a sidebar folder shows its first files without leaving the current folder, over a
- * dimmed backdrop. Once the preview is up, moving to another folder swaps it instantly; a short
- * grace period on leave avoids flashing the backdrop while the pointer crosses between rows.
+ * Hovering a sidebar folder previews it over the content area, at nearly the size it would have
+ * once opened, on a dimmed backdrop. The folder already open is not previewed. Once a preview is
+ * up, moving to another folder swaps it instantly; a short grace period on leave avoids flashing
+ * the backdrop while the pointer crosses between rows.
  */
 const PEEK_DELAY_MS = 350
 const PEEK_GRACE_MS = 120
+const PEEK_MARGIN = 24
+const PEEK_MAX_ITEMS = 60
 let peekToken = 0
 let peekHideTimer = null
 const peekOpen = () => $('#peek').classList.contains('show')
@@ -768,7 +771,8 @@ function hoverPreview(row, dir, name) {
   let timer
   row.addEventListener('mouseenter', () => {
     clearTimeout(peekHideTimer)
-    timer = setTimeout(() => showPeek(row, dir, name), peekOpen() ? 0 : PEEK_DELAY_MS)
+    if (samePath(dir, state.cwd)) return hidePeek()
+    timer = setTimeout(() => showPeek(dir, name), peekOpen() ? 0 : PEEK_DELAY_MS)
   })
   row.addEventListener('mouseleave', () => {
     clearTimeout(timer)
@@ -777,20 +781,29 @@ function hoverPreview(row, dir, name) {
   row.addEventListener('mousedown', hidePeek)
 }
 
-async function showPeek(row, dir, name) {
+async function showPeek(dir, name) {
   const token = ++peekToken
   const data = await list(dir)
   if (token !== peekToken) return
-  const peek = $('#peek')
-  const files = sorted(data.files).slice(0, 12)
+
+  const folders = sorted(data.folders)
+  const files = sorted(data.files)
+  const shown = Math.min(folders.length + files.length, PEEK_MAX_ITEMS)
   const head = el('div', 'peek-head')
-  head.append(el('b', '', name), el('span', 'fcount', countLabel(data)))
-  const body = el('div', 'peek-grid')
-  body.append(...files.map(previewImg))
-  peek.replaceChildren(head, files.length ? body : el('p', 'hint', 'Nessun file da mostrare'))
-  const r = row.getBoundingClientRect()
-  peek.style.left = r.right + 12 + 'px'
-  peek.style.top = Math.max(8, Math.min(r.top - 8, innerHeight - peek.offsetHeight - 8)) + 'px'
+  head.append(el('h2', '', name), el('span', 'fcount', countLabel(data)))
+  const body = shown
+    ? grid(folders.slice(0, shown), files.slice(0, Math.max(0, shown - folders.length)), null)
+    : el('p', 'empty', 'Cartella vuota')
+
+  const peek = $('#peek')
+  peek.replaceChildren(head, body)
+  const area = $('#main').getBoundingClientRect()
+  Object.assign(peek.style, {
+    left: area.left + PEEK_MARGIN + 'px',
+    top: area.top + PEEK_MARGIN + 'px',
+    width: area.width - PEEK_MARGIN * 2 + 'px',
+    height: area.height - PEEK_MARGIN * 2 + 'px',
+  })
   peek.classList.add('show')
   $('#dim').classList.add('show')
 }

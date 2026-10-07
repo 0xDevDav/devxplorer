@@ -304,30 +304,30 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 }
 #dim.show { opacity: 1; visibility: visible; transition-delay: 0s }
 
+/* Read-only preview laid over the content area; the pointer stays on the sidebar. */
 #peek {
   position: fixed;
   z-index: 17;
-  width: 340px;
-  padding: 12px;
-  background: var(--surface);
-  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px 22px;
+  background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
-  transform: translateX(-6px) scale(.98);
-  transform-origin: left top;
-  transition: opacity var(--normal) var(--ease), transform var(--normal) var(--ease), top var(--normal) var(--ease), visibility 0s var(--normal);
+  transform: scale(.96);
+  transition: opacity var(--normal) var(--ease), transform .26s var(--ease), visibility 0s var(--normal);
 }
 #peek.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s }
-.peek-head { display: flex; align-items: baseline; gap: 10px }
-.peek-head .hint, #peek > .hint { margin-top: 8px }
-.peek-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px }
-.peek-grid > * { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: var(--panel2) }
-.peek-grid .paper { padding: 3px; font-size: 3px }
-.peek-grid img.icon { object-fit: none }
+/* fade out the last row instead of cutting it */
+#peek::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(transparent, var(--bg)) }
+.peek-head { display: flex; align-items: baseline; gap: 12px; margin: 0 4px 14px }
+.peek-head h2 { margin: 0; font-size: 20px; font-weight: 600 }
+#peek .grid { align-content: start }
 
 /* ---------- context menu ---------- */
 
