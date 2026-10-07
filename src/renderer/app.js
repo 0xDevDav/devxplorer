@@ -730,9 +730,26 @@ function viewerKey(e) {
 
 /* ========== places bar: favorites, drives, extension filters ========== */
 
+// Outline icons on a 24x24 grid, drawn with currentColor so CSS sets their color.
+const ICONS = {
+  desktop: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  downloads: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  documents: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  pictures: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+  videos: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3z"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
+}
+
+function icon(name) {
+  const node = el('span', 'icon icon-' + name)
+  node.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`
+  return node
+}
+
 function placeButton(dir, name, kind) {
-  const b = el('button', 'place ' + kind + (samePath(dir, state.cwd) ? ' active' : ''))
-  b.append(el('i', 'glyph'), el('span', '', name))
+  const b = el('button', 'place' + (samePath(dir, state.cwd) ? ' active' : ''))
+  b.append(icon(kind), el('span', '', name))
   b.title = dir
   b.onclick = () => navigate(dir)
   b.onauxclick = e => { if (e.button === 1) newTab(dir) }
@@ -746,7 +763,8 @@ function placeButton(dir, name, kind) {
 }
 
 function renderPlaces() {
-  $('#favs').replaceChildren(...pins.map(p => placeButton(p.path, p.name, 'folder')))
+  const kindOf = pin => state.places.find(p => samePath(p.path, pin.path))?.kind || 'folder'
+  $('#favs').replaceChildren(...pins.map(p => placeButton(p.path, p.name, kindOf(p))))
   $('#drives').replaceChildren(...state.drives.map(d => placeButton(d, d.slice(0, 2), 'drive')))
 }
 

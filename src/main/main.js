@@ -63,7 +63,7 @@ const handlers = {
   init: () => ({
     start: startFolder(),
     places: [['Desktop', 'desktop'], ['Download', 'downloads'], ['Documenti', 'documents'], ['Immagini', 'pictures'], ['Video', 'videos']]
-      .map(([name, key]) => ({ name, path: app.getPath(key) })),
+      .map(([name, key]) => ({ name, path: app.getPath(key), kind: key })),
     drives: [...'CDEFGHIJKLMNOPQRSTUVWXYZ'].map(c => c + ':\\').filter(d => fs.existsSync(d)),
   }),
 
