@@ -56,9 +56,13 @@ function entries(data, at) {
 }
 
 // Bytes of the first language variant below a resource name entry.
+// A resource tree has three levels (type, name, language); deeper means a corrupt or looping file.
 function leaf(section, entry) {
   const { data, root, toOffset } = section
-  while (entry.isDir) entry = entries(data, root + entry.offset)[0]
+  for (let depth = 0; entry?.isDir; depth++) {
+    if (depth === 3) return null
+    entry = entries(data, root + entry.offset)[0]
+  }
   if (!entry) return null
   const at = root + entry.offset
   const start = toOffset(data.readUInt32LE(at))

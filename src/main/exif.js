@@ -7,6 +7,7 @@ const fsp = require('fs').promises
 
 const HEAD_BYTES = 256 * 1024
 const PHOTO_EXT = /\.(jpe?g|heic|heif)$/i
+const EXIF_MAX = 65536 // the format's own limit
 
 const TAGS = {
   0x010f: 'make',
@@ -180,6 +181,7 @@ async function exifFromHeic(p, buf) {
       const extentLength = readSized(buf, o, lengthSize)
       o += lengthSize
       if (id !== exifId || e > 0) continue
+      if (extentLength > EXIF_MAX) return info // EXIF is at most 64 KB; anything larger is corrupt
       const block = await readHead(p, extentLength, base + extentOffset)
       const tiffStart = 4 + block.readUInt32BE(0)
       Object.assign(info, parseTiff(block.subarray(tiffStart)), { width: info.width, height: info.height })
@@ -191,6 +193,8 @@ async function exifFromHeic(p, buf) {
 
 /* ---------- public API ---------- */
 
+// Bounded: entries are dropped oldest first, as a Map keeps insertion order.
+const CACHE_LIMIT = 5000
 const cache = new Map()
 
 // Returns { taken, make, model, lens, exposure, fNumber, iso, focalLength, width, height } (fields optional).
@@ -198,6 +202,7 @@ async function photoInfo(p, mtime) {
   if (!PHOTO_EXT.test(p)) return null
   const key = p + '|' + mtime
   if (!cache.has(key)) {
+    if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value)
     cache.set(key, (async () => {
       try {
         const buf = await readHead(p)
