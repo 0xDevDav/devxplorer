@@ -61,10 +61,11 @@ function powershell(script) {
 function launch(file, args, options = {}) {
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
-  spawn(file, args, { detached: true, stdio: 'ignore', env, ...options }).unref()
+  const child = spawn(file, args, { detached: true, stdio: 'ignore', env, ...options })
+  child.on('error', () => {})
+  child.unref()
 }
 
-const WINDOWS_TERMINAL = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WindowsApps', 'wt.exe')
 const VS_CODE = [
   path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'Code.exe'),
   path.join(process.env.ProgramFiles || '', 'Microsoft VS Code', 'Code.exe'),
@@ -305,10 +306,15 @@ const handlers = {
 
   runAsAdmin: p => powershell(`Start-Process -LiteralPath ${psQuote(p)} -Verb RunAs`).catch(() => null),
 
-  // Windows Terminal when installed, otherwise the classic command prompt.
+  /*
+   * Windows Terminal when installed, otherwise the classic command prompt. wt.exe is an app
+   * execution alias that only starts through the shell, hence Start-Process. Its -d argument is
+   * quoted by hand: a root like C:\ becomes C:\. so the closing quote is not escaped.
+   */
   openTerminal(dir) {
-    if (fs.existsSync(WINDOWS_TERMINAL)) launch(WINDOWS_TERMINAL, ['-d', dir])
-    else launch('cmd.exe', [], { cwd: dir })
+    const wtArgs = psQuote(`-d "${dir.replace(/\\$/, '\\.')}"`)
+    return powershell(`try { Start-Process wt.exe -ArgumentList ${wtArgs} -ErrorAction Stop } catch { Start-Process cmd.exe -WorkingDirectory ${psQuote(dir)} }`)
+      .then(() => null)
   },
 
   hasVsCode: () => !!VS_CODE,
