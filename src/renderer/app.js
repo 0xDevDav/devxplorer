@@ -36,6 +36,7 @@ const state = {
   selection: new Set(),
   anchor: null,
   sort: localStorage.sort || 'name',
+  group: localStorage.group || 'none',
   query: '',
 }
 
@@ -384,12 +385,78 @@ function showContent(path, nodes) {
   contentDelay = 0
 }
 
+/* ========== grouping ========== */
+
+const dayFormat = new Intl.DateTimeFormat('it', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+const monthFormat = new Intl.DateTimeFormat('it', { month: 'long', year: 'numeric' })
+const capitalize = text => text.charAt(0).toUpperCase() + text.slice(1)
+const startOfDay = time => new Date(time).setHours(0, 0, 0, 0)
+const extensionOf = name => name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
+
+function dayLabel(day) {
+  const daysAgo = Math.round((startOfDay(Date.now()) - day) / 86400000)
+  if (daysAgo === 0) return 'Oggi'
+  if (daysAgo === 1) return 'Ieri'
+  return capitalize(dayFormat.format(day))
+}
+
+const FILE_KINDS = [
+  ['Immagini', f => f.type === 'img'],
+  ['Video', f => f.type === 'video'],
+  ['Documenti', f => /^(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|txt|md|csv)$/.test(extensionOf(f.name))],
+  ['Audio', f => /^(mp3|wav|flac|m4a|aac|ogg|opus)$/.test(extensionOf(f.name))],
+  ['Archivi', f => /^(zip|rar|7z|tar|gz|bz2|xz)$/.test(extensionOf(f.name))],
+  ['Programmi e collegamenti', f => /^(exe|msi|bat|cmd|ps1|lnk|url)$/.test(extensionOf(f.name))],
+  ['Altro', () => true],
+]
+
+// Dates use the modification time, the same one behind the "most recent" sort.
+const GROUPINGS = {
+  day: { key: f => startOfDay(f.mtime), label: dayLabel, compare: (a, b) => b - a },
+  month: {
+    key: f => { const d = new Date(f.mtime); return new Date(d.getFullYear(), d.getMonth()).getTime() },
+    label: month => capitalize(monthFormat.format(month)),
+    compare: (a, b) => b - a,
+  },
+  kind: { key: f => FILE_KINDS.findIndex(([, test]) => test(f)), label: i => FILE_KINDS[i][0], compare: (a, b) => a - b },
+  extension: { key: f => extensionOf(f.name), label: ext => ext ? ext.toUpperCase() : 'Senza estensione', compare: collator.compare },
+}
+
+// Splits already sorted files into labelled groups; without a grouping returns a single unlabelled one.
+function groupFiles(files) {
+  const grouping = GROUPINGS[state.group]
+  if (!grouping) return [{ files }]
+  const groups = new Map()
+  for (const f of files) {
+    const key = grouping.key(f)
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(f)
+  }
+  return [...groups.keys()].sort(grouping.compare).map(key => ({ label: grouping.label(key), files: groups.get(key) }))
+}
+
+function groupHead(label, count) {
+  const head = el('div', 'group-head')
+  head.append(el('span', '', label), el('small', '', count))
+  return head
+}
+
 function grid(folders, files, dir) {
-  const node = el('div', 'grid')
-  folders.forEach(f => node.append(folderTile(f)))
-  files.forEach(f => node.append(fileCard(f, files)))
-  if (dir) dropTarget(node, dir)
-  return node
+  const groups = groupFiles(files)
+  const displayOrder = groups.flatMap(g => g.files) // viewer navigation follows what is on screen
+  const block = (items, folderItems = []) => {
+    const node = el('div', 'grid')
+    folderItems.forEach(f => node.append(folderTile(f)))
+    items.forEach(f => node.append(fileCard(f, displayOrder)))
+    if (dir) dropTarget(node, dir)
+    return node
+  }
+  if (!groups[0]?.label) return block(files, folders)
+
+  const root = el('div', 'groups')
+  if (folders.length) root.append(groupHead('Cartelle', folders.length), block([], folders))
+  for (const g of groups) root.append(groupHead(g.label, g.files.length), block(g.files))
+  return root
 }
 
 function setFocus(path) {
@@ -938,6 +1005,10 @@ function bindEvents() {
   $('#exportBtn').onclick = exportLibrary
   $('#importBtn').onclick = importLibrary
   $('#sort').onchange = e => setSort(e.target.value)
+  $('#group').onchange = e => {
+    state.group = localStorage.group = e.target.value
+    render()
+  }
   $('#q').oninput = e => {
     state.query = e.target.value.trim().toLowerCase()
     clearTimeout(state.queryTimer)
@@ -993,6 +1064,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   Object.assign(state, { places: init.places, drives: init.drives })
   pins ??= init.places
   $('#sort').value = state.sort
+  $('#group').value = state.group
   applySizes()
 
   const saved = store.get('tabs', []).filter(t => t?.cwd)
