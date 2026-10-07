@@ -55,6 +55,8 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  sort: '<path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/>',
+  group: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>',
   gear: '<path d="M19.23 10.41L21.53 10.87L21.53 13.13L19.23 13.59L18.23 15.99L19.54 17.94L17.94 19.54L15.99 18.23L13.59 19.23L13.13 21.53L10.87 21.53L10.41 19.23L8.01 18.23L6.06 19.54L4.46 17.94L5.77 15.99L4.77 13.59L2.47 13.13L2.47 10.87L4.77 10.41L5.77 8.01L4.46 6.06L6.06 4.46L8.01 5.77L10.41 4.77L10.87 2.47L13.13 2.47L13.59 4.77L15.99 5.77L17.94 4.46L19.54 6.06L18.23 8.01Z"/><circle cx="12" cy="12" r="3"/>',
   play: '<path fill="currentColor" stroke="none" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',
   // two-tone filled folder in the style of the Finder
@@ -193,7 +195,8 @@ const activeExtensions = () => extensions.filter(x => enabledExtensions[x.id] ??
 function chip(on, children, onclick, count) {
   const b = el('button', 'chip' + (on ? ' on' : ''))
   b.append(...children)
-  if (count != null) b.title = t.n('count.items', count)
+  // the label is repeated in the tooltip because narrow windows show only the dot
+  b.title = [b.textContent, count != null && t.n('count.items', count)].filter(Boolean).join(' · ')
   b.onclick = onclick
   return b
 }
@@ -1281,7 +1284,7 @@ function viewerKey(e) {
 function placeButton(dir, name, kind) {
   const b = el('button', 'place' + (samePath(dir, state.cwd) ? ' active' : ''))
   b.append(icon(kind), el('span', '', name))
-  b.title = dir
+  b.title = `${name}\n${dir}` // the name matters when narrow windows show only the icon
   b.onclick = () => navigate(dir)
   b.onauxclick = e => { if (e.button === 1) newTab(dir) }
   b.oncontextmenu = e => showMenu(e, [
@@ -1356,6 +1359,32 @@ function renderCrumbs() {
     crumbs.append(b)
     if (i < parts.length - 1) crumbs.append(icon('chevron', 'sep'))
   })
+  fitCrumbs()
+}
+
+/*
+ * When the path does not fit, intermediate folders collapse into a "…" button listing them,
+ * like the macOS path bar: the drive and the last folders stay visible.
+ */
+function fitCrumbs() {
+  const crumbs = $('#crumbs')
+  crumbs.querySelector('.crumb-more')?.nextElementSibling?.remove()
+  crumbs.querySelector('.crumb-more')?.remove()
+  const buttons = [...crumbs.querySelectorAll('button')]
+  buttons.forEach(b => { b.hidden = false; if (b.nextElementSibling) b.nextElementSibling.hidden = false })
+
+  const hidden = []
+  for (let i = 1; i < buttons.length - 1 && crumbs.scrollWidth > crumbs.clientWidth; i++) {
+    if (!hidden.length) buttons[0].nextElementSibling.after(el('button', 'crumb-more', '…'), icon('chevron', 'sep'))
+    buttons[i].hidden = true
+    buttons[i].nextElementSibling.hidden = true
+    hidden.push(buttons[i])
+  }
+  if (!hidden.length) return
+  crumbs.querySelector('.crumb-more').onclick = e => {
+    const r = e.currentTarget.getBoundingClientRect()
+    showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 6 }, hidden.map(b => ({ label: b.textContent, run: () => b.click() })))
+  }
 }
 
 /* ========== navigation and tabs ========== */
@@ -1552,8 +1581,9 @@ const SORT_OPTIONS = [['name', 'sort.name'], ['date', 'sort.date']]
 const GROUP_OPTIONS = [['none', 'group.none'], ['day', 'group.day'], ['month', 'group.month'], ['kind', 'group.kind'], ['extension', 'group.extension']]
 
 // A button showing the current choice that opens the options as a menu, like a macOS pop-up button.
-function popupButton(button, options, current, pick) {
-  button.replaceChildren(el('span', '', t(options.find(([value]) => value === current)?.[1])), icon('chevronDown'))
+// The leading icon replaces the label in narrow windows.
+function popupButton(button, options, current, pick, iconName) {
+  button.replaceChildren(icon(iconName, 'lead'), el('span', '', t(options.find(([value]) => value === current)?.[1])), icon('chevronDown'))
   button.onclick = () => {
     const r = button.getBoundingClientRect()
     showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 6 },
@@ -1562,8 +1592,8 @@ function popupButton(button, options, current, pick) {
 }
 
 function renderControls() {
-  popupButton($('#sort'), SORT_OPTIONS, state.sort, setSort)
-  popupButton($('#group'), GROUP_OPTIONS, state.group, setGroup)
+  popupButton($('#sort'), SORT_OPTIONS, state.sort, setSort, 'sort')
+  popupButton($('#group'), GROUP_OPTIONS, state.group, setGroup, 'group')
 }
 
 /* ========== global events ========== */
@@ -1670,6 +1700,7 @@ function bindEvents() {
   bindViewerZoom()
   bindPalette()
   bindSplitter()
+  new ResizeObserver(() => requestAnimationFrame(fitCrumbs)).observe($('#toolbar'))
   document.addEventListener('wheel', e => {
     if (!e.ctrlKey || viewerOpen()) return
     e.preventDefault()

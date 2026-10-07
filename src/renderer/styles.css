@@ -186,21 +186,27 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 
 #toolbar { grid-area: toolbar; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line) }
 
-#crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; margin-right: auto; overflow: hidden }
+#toolbar > * { flex: none }
+#crumbs { display: flex; flex: 1 1 0; align-items: center; gap: 2px; min-width: 0; margin-right: auto; overflow: hidden }
+#crumbs button, #crumbs .sep { flex: none }
+#crumbs button { max-width: 220px; overflow: hidden; text-overflow: ellipsis }
+#crumbs button:last-of-type { flex: 0 1 auto; min-width: 48px }
+#crumbs .crumb-more { flex: none; letter-spacing: 1px }
 #crumbs button { padding: 4px 8px; background: none; border: 0; border-radius: 6px; color: var(--muted); white-space: nowrap; cursor: pointer }
 #crumbs button:last-of-type { color: var(--text); font-weight: 600 }
 #crumbs button:hover { background: var(--panel2); color: var(--text) }
 #crumbs .sep { width: 12px; height: 12px; color: var(--faint) }
 
-.search { position: relative; display: flex; align-items: center }
+.search { position: relative; display: flex; flex: 0 1 220px !important; align-items: center; min-width: 110px }
 .search .icon { position: absolute; left: 9px; width: 14px; height: 14px; color: var(--muted); pointer-events: none }
-#q { width: 220px; padding: 5px 10px 5px 29px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast), box-shadow var(--fast) }
+#q { width: 100%; padding: 5px 10px 5px 29px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast), box-shadow var(--fast) }
 #q:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft) }
 #q::-webkit-search-cancel-button { display: none }
 
 .popup { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; cursor: pointer }
 .popup:hover { border-color: var(--line-strong) }
 .popup .icon { width: 12px; height: 12px; color: var(--muted) }
+.popup .lead { display: none; width: 15px; height: 15px; color: var(--text-soft) }
 #settingsBtn { display: grid; place-items: center; width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer }
 #settingsBtn:hover { background: var(--panel2); border-color: var(--line); color: var(--text) }
 
@@ -618,3 +624,21 @@ dialog .actions button:hover { border-color: var(--muted) }
 .dot.todo, .pill.todo { background: var(--status-todo) }
 .dot.done, .pill.done { background: var(--status-done) }
 .dot.drop, .pill.drop { background: var(--status-drop) }
+
+/* ---------- narrow windows ---------- */
+
+/* status filters keep only their colored dot; name and count stay in the tooltip */
+@media (max-width: 1100px) {
+  .chip:has(.dot) span { display: none }
+  .chip:has(.dot) { padding: 6px 8px }
+}
+
+/* places become icons and the toolbar pop-ups show their icon instead of the label */
+@media (max-width: 900px) {
+  .place > span:not(.icon) { display: none }
+  .place { padding: 6px 8px }
+  .popup > span:not(.icon) { display: none }
+  .popup > .icon:last-child { display: none }
+  .popup .lead { display: inline-flex }
+  .popup { padding: 5px 7px 5px 9px }
+}
