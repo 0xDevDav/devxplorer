@@ -498,7 +498,6 @@ app.whenReady().then(() => {
     titleBarOverlay: { ...chrome, height: 40 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      plugins: true, // built-in PDF viewer
     },
   })
   if (saved.maximized) win.maximize()
