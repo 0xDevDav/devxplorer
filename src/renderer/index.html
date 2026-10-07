@@ -57,28 +57,37 @@
 
   <dialog id="settings">
     <form method="dialog">
-      <h3 data-i18n="settings.appearance"></h3>
-      <div id="themePicker" class="segmented"></div>
-      <div id="accentPicker" class="swatches"></div>
-      <label id="glassRow" class="ext-row glass-row" hidden>
-        <div><b data-i18n="glass.title"></b><p class="hint" data-i18n="glass.hint"></p></div>
-        <input type="checkbox" id="glassToggle"><span class="switch"></span>
-      </label>
-      <h3 class="section" data-i18n="settings.language"></h3>
-      <div id="languagePicker" class="segmented"></div>
-      <h3 class="section" data-i18n="settings.integration"></h3>
-      <label class="ext-row">
-        <div><b data-i18n="shell.title"></b><p class="hint" data-i18n="shell.hint"></p></div>
-        <input type="checkbox" id="shellToggle"><span class="switch"></span>
-      </label>
-      <h3 class="section" data-i18n="extensions.title"></h3>
-      <p class="hint" data-i18n="extensions.hint"></p>
-      <div id="extList"></div>
-      <h3 class="section" data-i18n="data.title"></h3>
-      <p class="hint" data-i18n="data.hint"></p>
-      <div class="actions">
-        <button type="button" id="exportBtn" data-i18n="data.export"></button>
-        <button type="button" id="importBtn" data-i18n="data.import"></button>
+      <h2 data-i18n="settings.title"></h2>
+      <div class="settings-grid">
+        <section>
+          <h3 data-i18n="settings.appearance"></h3>
+          <div id="themePicker" class="segmented"></div>
+          <div id="accentPicker" class="swatches"></div>
+          <label id="glassRow" class="ext-row glass-row" hidden>
+            <div><b data-i18n="glass.title"></b><p class="hint" data-i18n="glass.hint"></p></div>
+            <input type="checkbox" id="glassToggle"><span class="switch"></span>
+          </label>
+          <h3 class="section" data-i18n="settings.language"></h3>
+          <div id="languagePicker" class="segmented"></div>
+        </section>
+        <section>
+          <h3 data-i18n="extensions.title"></h3>
+          <p class="hint" data-i18n="extensions.hint"></p>
+          <div id="extList"></div>
+        </section>
+        <section>
+          <h3 data-i18n="settings.integration"></h3>
+          <label class="ext-row">
+            <div><b data-i18n="shell.title"></b><p class="hint" data-i18n="shell.hint"></p></div>
+            <input type="checkbox" id="shellToggle"><span class="switch"></span>
+          </label>
+          <h3 class="section" data-i18n="data.title"></h3>
+          <p class="hint" data-i18n="data.hint"></p>
+          <div class="actions">
+            <button type="button" id="exportBtn" data-i18n="data.export"></button>
+            <button type="button" id="importBtn" data-i18n="data.import"></button>
+          </div>
+        </section>
       </div>
       <menu><button value="ok" class="primary" autofocus data-i18n="dialog.done"></button></menu>
     </form>
