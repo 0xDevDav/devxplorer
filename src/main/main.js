@@ -601,9 +601,9 @@ function createWindow(startFolder = null, from = null) {
   win.on('focus', () => { lastWindow = win })
   if (!from && saved.maximized) win.maximize()
   // The window only ever shows the app: no new windows, and no navigation away (a file dropped
-  // outside a drop zone would otherwise replace the page).
+  // outside a drop zone would otherwise replace the page). Reloading the app itself is allowed.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  win.webContents.on('will-navigate', e => e.preventDefault())
+  win.webContents.on('will-navigate', e => { if (e.url !== win.webContents.getURL()) e.preventDefault() })
   // While a preview is open, the window's close button (or Alt+F4) closes the preview instead:
   // users read the X in the corner as "close what I am looking at". Quitting the app or ending the
   // Windows session must never be held back by this.

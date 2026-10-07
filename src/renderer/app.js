@@ -23,7 +23,7 @@ const fileUrl = p => 'file:///' + encodeURI(p.replace(/\\/g, '/')).replace(/#/g,
 /* ========== language ========== */
 
 // "system" follows the Windows display language; unsupported languages fall back to English.
-const languagePreference = () => localStorage.language || 'system'
+const languagePreference = () => localStorage.language || 'en'
 const language = pickLanguage(languagePreference() === 'system' ? navigator.language : languagePreference())
 const t = translator(language)
 document.documentElement.lang = language
@@ -241,7 +241,7 @@ const nameMatches = item => !state.query || item.name.toLowerCase().includes(sta
  */
 const extensions = []
 const enabledExtensions = store.get('ext', {})
-const activeExtensions = () => extensions.filter(x => enabledExtensions[x.id] ?? x.enabledByDefault ?? true)
+const activeExtensions = () => extensions.filter(x => enabledExtensions[x.id] ?? false)
 
 // Filter item in the places bar, styled like a Finder tag; count goes in the tooltip.
 function chip(on, children, onclick, count) {
@@ -321,9 +321,9 @@ function applyTheme() {
   if (!viewerOpen()) syncWindowControls()
 }
 
-function renderAccentPicker() {
+function renderAccentPicker(box = $('#accentPicker')) {
   const theme = resolvedTheme()
-  $('#accentPicker').replaceChildren(...ACCENTS.map(([id, label, dark, light]) => {
+  box.replaceChildren(...ACCENTS.map(([id, label, dark, light]) => {
     const b = el('button', 'swatch' + (currentAccent()[0] === id ? ' on' : ''))
     b.type = 'button'
     b.title = t(label)
@@ -331,7 +331,7 @@ function renderAccentPicker() {
     b.onclick = () => {
       localStorage.accent = id
       applyTheme()
-      renderAccentPicker()
+      renderAccentPicker(box)
     }
     return b
   }))
@@ -347,15 +347,15 @@ function syncWindowControls() {
   })
 }
 
-function renderThemePicker() {
-  $('#themePicker').replaceChildren(...THEMES.map(([value, label]) => {
+function renderThemePicker(box = $('#themePicker'), accentBox = $('#accentPicker')) {
+  box.replaceChildren(...THEMES.map(([value, label]) => {
     const b = el('button', themePreference() === value ? 'on' : '', t(label))
     b.type = 'button'
     b.onclick = () => {
       localStorage.theme = value
       applyTheme()
-      renderThemePicker()
-      renderAccentPicker()
+      renderThemePicker(box, accentBox)
+      renderAccentPicker(accentBox)
     }
     return b
   }))
@@ -2557,6 +2557,9 @@ function bindEvents() {
   }
   $('#exportBtn').onclick = exportLibrary
   $('#logBtn').onclick = () => call('showLog')
+  $('#setupBtn').onclick = () => { $('#settings').close(); openSetup() }
+  // The assistant is not dismissed with Esc: it ends with its last button.
+  $('#setup').addEventListener('cancel', e => e.preventDefault())
   $('#importBtn').onclick = importLibrary
   $('.search').prepend(icon('search'))
   $('#q').addEventListener('keydown', e => {
@@ -2706,6 +2709,109 @@ function bindTooltips() {
   for (const type of ['pointerdown', 'wheel', 'keydown', 'scroll']) document.addEventListener(type, hideTooltip, true)
 }
 
+/* ========== setup assistant ========== */
+
+/*
+ * Shown on the first start, like the Mac's Setup Assistant: language, appearance, extensions and
+ * File Explorer integration, then a few tips. Every choice applies at once; it can be run again
+ * from General settings. Choosing a language reloads the page, so the current step is remembered.
+ */
+const SETUP_STEPS = ['welcome', 'appearance', 'extensions', 'integration', 'done']
+
+function openSetup(step = 0) {
+  localStorage.setupStep = step
+  const sheet = $('#setup')
+  const name = SETUP_STEPS[step]
+  const page = el('div', 'setup-page')
+  const heading = (title, text) => page.append(el('h2', '', t(title)), el('p', 'setup-text', t(text)))
+
+  if (name === 'welcome') {
+    page.append(Object.assign(el('img', 'setup-icon'), { src: '../../assets/icon.png', alt: '' }))
+    heading('setup.welcome.title', 'setup.welcome.text')
+    const choices = el('div', 'segmented')
+    for (const [code, label] of LANGUAGES) {
+      const b = el('button', language === code ? 'on' : '', label)
+      b.type = 'button'
+      b.onclick = () => {
+        if (code === language) return
+        localStorage.language = code
+        location.reload()
+      }
+      choices.append(b)
+    }
+    page.append(choices)
+  } else if (name === 'appearance') {
+    heading('setup.appearance.title', 'setup.appearance.text')
+    const themes = el('div', 'segmented')
+    const accents = el('div', 'swatches')
+    page.append(themes, accents)
+    renderThemePicker(themes, accents)
+    renderAccentPicker(accents)
+  } else if (name === 'extensions') {
+    heading('setup.extensions.title', 'setup.extensions.text')
+    const group = el('div', 'set-group')
+    for (const x of extensions) {
+      const row = el('label', 'set-row')
+      const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
+      const text = el('div')
+      text.append(el('span', '', x.name), el('p', 'hint', x.description))
+      toggle.onchange = () => {
+        enabledExtensions[x.id] = toggle.checked
+        store.set('ext', enabledExtensions)
+        renderExtensionFilters()
+      }
+      row.append(text, toggle, el('span', 'switch'))
+      group.append(row)
+    }
+    page.append(group)
+  } else if (name === 'integration') {
+    heading('setup.integration.title', 'setup.integration.text')
+    const row = el('label', 'set-row')
+    const toggle = Object.assign(el('input'), { type: 'checkbox' })
+    const text = el('div')
+    text.append(el('span', '', t('shell.title')), el('p', 'hint', t('shell.hint')))
+    call('shellIntegration').then(on => { toggle.checked = !!on })
+    toggle.onchange = async () => { toggle.checked = !!(await call('setShellIntegration', toggle.checked)) }
+    row.append(text, toggle, el('span', 'switch'))
+    const group = el('div', 'set-group')
+    group.append(row)
+    page.append(group)
+  } else {
+    page.append(Object.assign(el('img', 'setup-icon'), { src: '../../assets/icon.png', alt: '' }))
+    heading('setup.done.title', 'setup.done.text')
+    const tips = el('div', 'set-group')
+    for (const [keys, label] of [['Ctrl+K', 'keys.palette'], ['key.space', 'keys.preview'], ['Ctrl+I', 'menu.info'], ['Ctrl+2', 'view.listShort']]) {
+      const row = el('div', 'set-row')
+      row.append(el('span', '', t(label)), keysNode(keys))
+      tips.append(row)
+    }
+    page.append(tips)
+  }
+
+  const dots = el('div', 'setup-dots')
+  SETUP_STEPS.forEach((_, i) => dots.append(el('span', i === step ? 'on' : '')))
+  const back = el('button', '', t('setup.back'))
+  back.type = 'button'
+  back.hidden = step === 0
+  back.onclick = () => openSetup(step - 1)
+  const next = el('button', 'primary', t(step === SETUP_STEPS.length - 1 ? 'setup.start' : 'setup.continue'))
+  next.type = 'button'
+  next.onclick = () => step === SETUP_STEPS.length - 1 ? finishSetup() : openSetup(step + 1)
+  const nav = el('div', 'setup-nav')
+  nav.append(dots, back, next)
+
+  sheet.replaceChildren(page, nav)
+  if (!sheet.open) sheet.showModal()
+  next.focus()
+}
+
+function finishSetup() {
+  localStorage.setupDone = 'true'
+  delete localStorage.setupStep
+  $('#setup').close()
+  render()
+}
+
 /* ========== startup ========== */
 
 // Errors in the page go to the app's log file; reporting must never raise another error.
@@ -2725,6 +2831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   pins ??= init.places
   renderControls()
   applySizes()
+  if (localStorage.setupDone !== 'true' && !init.secondary) openSetup(Number(localStorage.setupStep) || 0)
 
   secondaryWindow = init.secondary
   const saved = secondaryWindow ? [] : store.get('tabs', []).filter(tab => tab?.cwd)
@@ -2735,6 +2842,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabs.push({ cwd: init.start, focus: null })
     tabIndex = tabs.length - 1
   }
-  if (!tabs.length) tabs = [{ cwd: init.places.find(p => p.kind === 'downloads').path, focus: null }]
+  // A first start opens the Desktop: a place everyone recognises at a glance.
+  if (!tabs.length) tabs = [{ cwd: init.places.find(p => p.kind === 'desktop').path, focus: null }]
   showTab()
 })

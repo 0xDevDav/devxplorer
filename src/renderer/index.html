@@ -54,6 +54,8 @@
     </form>
   </dialog>
 
+  <dialog id="setup"></dialog>
+
   <dialog id="alert" role="alertdialog" aria-describedby="alertText">
     <form method="dialog">
       <img class="alert-icon" src="../../assets/icon.png" alt="">
@@ -107,6 +109,12 @@
               <div><span data-i18n="shell.title"></span><p class="hint" data-i18n="shell.hint"></p></div>
               <input type="checkbox" id="shellToggle"><span class="switch"></span>
             </label>
+          </div>
+          <div class="set-group">
+            <div class="set-row">
+              <div><span data-i18n="setup.again.title"></span><p class="hint" data-i18n="setup.again.hint"></p></div>
+              <div class="set-actions"><button type="button" id="setupBtn" data-i18n="setup.again.button"></button></div>
+            </div>
           </div>
           <div class="set-group">
             <div class="set-row">
