@@ -1857,7 +1857,11 @@ function bindEvents() {
     if (clipboardKey) { e.preventDefault(); return clipboardKey() }
     if (e.key === ' ') {
       e.preventDefault()
-      return $('#content .item.sel:not(.folder)')?.preview()
+      // A folder has nothing to preview, so Space opens it like Enter.
+      const file = $('#content .item.sel:not(.folder)')
+      if (file) return file.preview()
+      const folder = $('#content .item.folder.sel')
+      return folder ? navigate(folder.dataset.path) : enterFocus()
     }
 
     if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette() }
