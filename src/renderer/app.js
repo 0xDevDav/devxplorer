@@ -1,0 +1,999 @@
+/* ========== helpers ========== */
+
+const $ = selector => document.querySelector(selector)
+const $$ = selector => [...document.querySelectorAll(selector)]
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag)
+  if (cls) node.className = cls
+  if (text != null) node.textContent = text
+  return node
+}
+
+// Windows paths only; drive roots keep their trailing backslash ("C:\").
+const baseName = p => { const t = p.replace(/\\$/, ''); return t.slice(t.lastIndexOf('\\') + 1) }
+const parentDir = p => {
+  const head = p.slice(0, p.lastIndexOf('\\', p.length - 2))
+  return head.endsWith(':') || !head ? (head || p.slice(0, 2)) + '\\' : head
+}
+const joinPath = (dir, name) => dir.endsWith('\\') ? dir + name : dir + '\\' + name
+const samePath = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase()
+const fileUrl = p => 'file:///' + encodeURI(p.replace(/\\/g, '/')).replace(/#/g, '%23').replace(/\?/g, '%3F')
+
+const collator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' })
+const byName = (a, b) => collator.compare(a.name, b.name)
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
+
+/* ========== state ========== */
+
+const state = {
+  cwd: null,
+  focus: null, // folder whose content is shown in the right pane
+  meta: {}, // path -> annotations, filled from every listing
+  allMeta: [], // annotations of the whole library, for extension sidebars
+  places: [],
+  drives: [],
+  selection: new Set(),
+  anchor: null,
+  sort: localStorage.sort || 'name',
+  query: '',
+}
+
+const store = {
+  get: (key, fallback) => { try { return JSON.parse(localStorage[key]) ?? fallback } catch { return fallback } },
+  set: (key, value) => { localStorage[key] = JSON.stringify(value) },
+}
+
+const treeExpanded = new Set(store.get('tree', []))
+const saveTree = () => store.set('tree', [...treeExpanded])
+let pins = store.get('pins', null)
+
+let tabs = []
+let tabIndex = 0
+const currentTab = () => tabs[tabIndex]
+const saveTabs = () => { store.set('tabs', tabs); store.set('tabIndex', tabIndex) }
+
+async function call(name, ...args) {
+  try {
+    return await api.call(name, ...args)
+  } catch (e) {
+    toast(e.message.replace(/^.*Error: /, ''))
+    return null
+  }
+}
+
+function remember(items) {
+  for (const item of items) state.meta[item.path] = item.meta
+  return items
+}
+
+async function list(dir) {
+  const data = (await call('list', dir)) || { folders: [], files: [] }
+  remember(data.folders)
+  remember(data.files)
+  return data
+}
+
+function toast(message) {
+  const t = $('#toast')
+  t.textContent = message
+  t.hidden = false
+  clearTimeout(toast.timer)
+  toast.timer = setTimeout(() => { t.hidden = true }, 4000)
+}
+
+const sorted = items => items.sort(state.sort === 'date' ? (a, b) => b.mtime - a.mtime : byName)
+const nameMatches = item => !state.query || item.name.toLowerCase().includes(state.query)
+
+/* ========== extensions ========== */
+
+/*
+ * Extensions are registered by the scripts in ./extensions and receive a small API.
+ * Every hook is optional:
+ *   badges(meta) -> Node[]            labels drawn on thumbnails and folder rows
+ *   dimmed(meta) -> boolean           render the item faded
+ *   menu(paths, metas) -> items[]     context menu entries for the selection
+ *   sidebar(allMetas) -> Node[]       content of the extension's sidebar section
+ *   filter: { active(), match(meta), reset() }
+ *   viewer: { hint, onKey(event, path) -> boolean }
+ */
+const extensions = []
+const enabledExtensions = store.get('ext', {})
+const activeExtensions = () => extensions.filter(x => enabledExtensions[x.id] ?? x.enabledByDefault ?? true)
+
+function chip(on, children, onclick) {
+  const b = el('button', 'chip' + (on ? ' on' : ''))
+  b.append(...children)
+  b.onclick = onclick
+  return b
+}
+
+const extensionApi = {
+  el,
+  chip,
+  compare: collator.compare,
+  ask,
+  setMeta,
+  render,
+  refreshViewer: () => { if (viewerOpen()) showViewer() },
+}
+
+function registerExtension(factory) {
+  extensions.push(factory(extensionApi))
+}
+
+// Extension filters query the library, so their results span every folder on the PC.
+const filtering = () => activeExtensions().some(x => x.filter?.active())
+const metaMatches = m => !!m && activeExtensions().every(x => !x.filter?.active() || x.filter.match(m))
+
+function badges(p) {
+  const box = el('span', 'badges')
+  const m = state.meta[p]
+  if (m) activeExtensions().forEach(x => box.append(...(x.badges?.(m) || [])))
+  return box
+}
+
+const dimmed = p => !!state.meta[p] && activeExtensions().some(x => x.dimmed?.(state.meta[p]))
+
+/* ========== theme ========== */
+
+const THEMES = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']]
+const systemDark = matchMedia('(prefers-color-scheme: dark)')
+const themePreference = () => localStorage.theme || 'system'
+
+function applyTheme() {
+  const preference = themePreference()
+  document.documentElement.dataset.theme = preference === 'system' ? (systemDark.matches ? 'dark' : 'light') : preference
+  if (!viewerOpen()) syncWindowControls()
+}
+
+// The native window controls are drawn by Windows and must be recolored to match the theme.
+function syncWindowControls() {
+  const css = getComputedStyle(document.documentElement)
+  call('overlay', {
+    color: css.getPropertyValue('--bg').trim(),
+    symbolColor: css.getPropertyValue('--overlay-symbols').trim(),
+    remember: true,
+  })
+}
+
+function renderThemePicker() {
+  $('#themePicker').replaceChildren(...THEMES.map(([value, label]) => {
+    const b = el('button', themePreference() === value ? 'on' : '', label)
+    b.type = 'button'
+    b.onclick = () => {
+      localStorage.theme = value
+      applyTheme()
+      renderThemePicker()
+    }
+    return b
+  }))
+}
+
+/* ========== settings ========== */
+
+function openSettings() {
+  renderThemePicker()
+  $('#extList').replaceChildren(...extensions.map(x => {
+    const row = el('label', 'ext-row')
+    const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
+    const text = el('div')
+    text.append(el('b', '', x.name), el('p', 'hint', x.description))
+    toggle.onchange = () => {
+      enabledExtensions[x.id] = toggle.checked
+      store.set('ext', enabledExtensions)
+      x.filter?.reset()
+      render()
+    }
+    row.append(text, toggle, el('span', 'switch'))
+    return row
+  }))
+  $('#settings').showModal()
+}
+
+async function exportLibrary() {
+  const count = await call('exportLibrary')
+  if (count != null) toast(`Esportati ${count} file con stati o tag`)
+}
+
+async function importLibrary() {
+  const count = await call('importLibrary')
+  if (count == null) return
+  toast(`Importati ${count} file con stati o tag`)
+  refresh()
+}
+
+/* ========== previews ========== */
+
+// Generic files: text excerpt first, then the shell thumbnail, then the associated program icon.
+async function loadPreview(path, type) {
+  if (type !== 'file') return { img: await call('thumb', path) }
+  const text = await call('peek', path)
+  if (text != null) return { text }
+  const img = await call('thumb', path)
+  return img ? { img } : { icon: await call('icon', path) }
+}
+
+const previews = new Map()
+const loadedPreviews = new Set()
+const previewObserver = new IntersectionObserver(entries => entries.forEach(async entry => {
+  if (!entry.isIntersecting) return
+  previewObserver.unobserve(entry.target)
+  const img = entry.target
+  const key = img.dataset.src + '|' + img.dataset.mtime
+  if (!previews.has(key)) previews.set(key, loadPreview(img.dataset.src, img.dataset.type))
+  // Only the first appearance fades in; re-renders show cached previews immediately.
+  const instant = loadedPreviews.has(key)
+  const preview = await previews.get(key)
+  loadedPreviews.add(key)
+  let node = img
+  if (preview.text != null) img.replaceWith(node = el('div', 'paper', preview.text.slice(0, 600)))
+  else if (preview.img) img.src = preview.img
+  else if (preview.icon) { img.src = preview.icon; img.classList.add('icon') }
+  if (instant) node.classList.add('instant')
+}))
+
+function previewImg(item) {
+  const img = el('img')
+  img.draggable = false
+  Object.assign(img.dataset, { src: item.path, mtime: item.mtime, type: item.type })
+  previewObserver.observe(img)
+  return img
+}
+
+const countLabel = data => [
+  data.files.length && `${data.files.length} file`,
+  data.folders.length && `${data.folders.length} cartell${data.folders.length > 1 ? 'e' : 'a'}`,
+].filter(Boolean).join(' · ') || 'vuota'
+
+// Fills a 2x2 collage with the first files of a folder; runs after the row is on screen.
+async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
+  const data = await list(path)
+  countEl.textContent = filesOnly ? `${data.files.length} file` : countLabel(data)
+  const files = sorted(data.files).slice(0, 4)
+  if (files.length) collage.append(...files.map(previewImg))
+  else collage.classList.add('empty')
+}
+
+/* ========== main view: folder list + content pane ========== */
+
+let renderId = 0
+async function render() {
+  if (!state.cwd) return
+  const id = ++renderId
+
+  state.allMeta = (await call('allMeta')) || []
+  if (filtering()) {
+    const all = remember((await call('annotated')) || []).filter(i => metaMatches(i.meta))
+    if (id !== renderId) return
+    const folders = all.filter(i => i.isDir && nameMatches(i))
+    const files = all.filter(i => !i.isDir && nameMatches(i))
+    const count = folders.length + files.length
+    $('#folders').hidden = true
+    showContent(null, [
+      el('p', 'hint', `${count} element${count === 1 ? 'o' : 'i'} con questo filtro, in tutto il PC`),
+      count ? grid(folders, files, null) : el('p', 'empty', 'Nessun risultato'),
+    ])
+  } else {
+    const data = await list(state.cwd)
+    if (id !== renderId) return
+    const folders = sorted(data.folders).filter(nameMatches)
+    const here = { name: 'File in questa cartella', path: state.cwd, self: true }
+    if (!folders.length) {
+      $('#folders').hidden = true
+      await renderPane({ ...here, name: baseName(state.cwd) }, data)
+    } else {
+      const entries = data.files.length ? [here, ...folders] : folders
+      if (!entries.some(e => samePath(e.path, state.focus))) setFocus(entries[0].path)
+      const pane = $('#folders')
+      const scroll = pane.scrollTop
+      pane.replaceChildren(...entries.map(folderRow))
+      pane.hidden = false
+      pane.scrollTop = scroll
+      const focused = entries.find(e => samePath(e.path, state.focus))
+      await renderPane(focused, focused.self ? data : null)
+    }
+  }
+
+  renderCrumbs()
+  renderTabs()
+  renderExtensionSidebar()
+  paintSelection()
+}
+
+function folderRow(entry) {
+  const row = el('div', 'frow' + (samePath(entry.path, state.focus) ? ' focus' : '') + (!entry.self && dimmed(entry.path) ? ' dim' : ''))
+  row.entry = entry
+  const collage = el('div', 'collage')
+  const count = el('div', 'fcount')
+  const info = el('div', 'finfo')
+  info.append(el('div', 'fname', entry.name), count)
+  if (!entry.self) info.append(badges(entry.path))
+  row.append(collage, info)
+  fillFolderPreview(entry.path, collage, count, entry.self)
+
+  row.addEventListener('click', e => { if (!e.ctrlKey && !e.shiftKey) focusEntry(entry) })
+  dropTarget(row, entry.path)
+  if (!entry.self) {
+    selectable(row, entry.path, true)
+    row.addEventListener('dblclick', () => navigate(entry.path))
+  }
+  return row
+}
+
+let paneId = 0
+async function renderPane(entry, data) {
+  const id = ++paneId
+  data ??= await list(entry.path)
+  if (id !== paneId) return
+  const files = sorted(data.files).filter(nameMatches)
+  // The cwd's own subfolders are already listed on the left.
+  const folders = entry.self ? [] : sorted(data.folders).filter(nameMatches)
+
+  const head = el('div', 'pane-head')
+  const title = el('div', 'pane-title')
+  title.append(el('h2', '', entry.name), el('span', 'fcount', entry.self ? `${data.files.length} file` : countLabel(data)))
+  if (!entry.self) title.append(badges(entry.path))
+  head.append(title)
+  if (!entry.self) {
+    const open = el('button', 'ghost', 'Apri  →')
+    open.onclick = () => navigate(entry.path)
+    head.append(open)
+  }
+
+  showContent(entry.path, [
+    head,
+    folders.length || files.length ? grid(folders, files, entry.path) : el('p', 'empty', 'Cartella vuota'),
+  ])
+  paintSelection()
+}
+
+function showContent(path, nodes) {
+  const content = $('#content')
+  const samePane = samePath(content.dataset.path, path)
+  const scroll = content.scrollTop
+  content.dataset.path = path || ''
+  content.replaceChildren(...nodes)
+  content.scrollTop = samePane ? scroll : 0
+  if (!samePane && !reducedMotion.matches) {
+    content.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+      { duration: 180, easing: 'cubic-bezier(.2, .8, .2, 1)' })
+  }
+}
+
+function grid(folders, files, dir) {
+  const node = el('div', 'grid')
+  folders.forEach(f => node.append(folderTile(f)))
+  files.forEach(f => node.append(fileCard(f, files)))
+  if (dir) dropTarget(node, dir)
+  return node
+}
+
+function setFocus(path) {
+  state.focus = path
+  currentTab().focus = path
+  saveTabs()
+}
+
+function focusEntry(entry) {
+  if (samePath(entry.path, state.focus)) return
+  setFocus(entry.path)
+  for (const row of $$('#folders .frow')) {
+    const on = row.entry === entry
+    row.classList.toggle('focus', on)
+    if (on) row.scrollIntoView({ block: 'nearest' })
+  }
+  renderPane(entry, null)
+}
+
+function moveFocus(step) {
+  const rows = $$('#folders .frow')
+  if (!rows.length || $('#folders').hidden) return
+  const i = rows.findIndex(r => r.classList.contains('focus'))
+  focusEntry(rows[Math.max(0, Math.min(rows.length - 1, i + step))].entry)
+}
+
+function enterFocus() {
+  if (!filtering() && state.focus && !samePath(state.focus, state.cwd) && !$('#folders').hidden) navigate(state.focus)
+}
+
+function folderTile(folder) {
+  const tile = el('div', 'item folder' + (dimmed(folder.path) ? ' dim' : ''))
+  const thumb = el('div', 'thumb')
+  const collage = el('div', 'collage')
+  const count = el('div', 'fcount')
+  thumb.append(collage, badges(folder.path))
+  tile.append(thumb, el('div', 'name', folder.name), count)
+  tile.title = folder.path
+  fillFolderPreview(folder.path, collage, count)
+  selectable(tile, folder.path, true)
+  tile.addEventListener('dblclick', () => navigate(folder.path))
+  dropTarget(tile, folder.path)
+  return tile
+}
+
+function fileCard(file, siblings) {
+  const card = el('div', 'item' + (dimmed(file.path) ? ' dim' : ''))
+  const thumb = el('div', 'thumb')
+  thumb.append(previewImg(file), badges(file.path))
+  if (file.type === 'video') thumb.append(el('span', 'play', '▶'))
+  card.append(thumb, el('div', 'name', file.name))
+  card.title = file.path
+  selectable(card, file.path, false)
+  card.addEventListener('dblclick', () => openViewer(siblings, file))
+
+  // Dropping on a card inserts before or after it, depending on the pointer's half.
+  const after = e => { const r = card.getBoundingClientRect(); return e.clientX > r.left + r.width / 2 }
+  card.addEventListener('dragover', e => {
+    e.preventDefault()
+    e.stopPropagation()
+    card.classList.toggle('ins-after', after(e))
+    card.classList.toggle('ins-before', !after(e))
+  })
+  card.addEventListener('dragleave', () => card.classList.remove('ins-before', 'ins-after'))
+  card.addEventListener('drop', async e => {
+    e.preventDefault()
+    e.stopPropagation()
+    const insertAfter = after(e)
+    card.classList.remove('ins-before', 'ins-after')
+    const paths = droppedPaths(e)
+    const dir = parentDir(file.path)
+    if (!paths.length) return
+    if (paths.every(p => samePath(parentDir(p), dir))) await reorder(dir, paths, file.path, insertAfter)
+    else await call('move', paths, dir)
+    refresh()
+  })
+  return card
+}
+
+/* ========== selection ========== */
+
+const visiblePaths = () => $$('#main [data-path]').map(n => n.dataset.path)
+const selectedInOrder = () => [...new Set(visiblePaths().filter(p => state.selection.has(p)))]
+
+function selectable(node, path, isFolder) {
+  node.dataset.path = path
+  if (isFolder) node.dataset.folder = ''
+  node.draggable = true
+  node.addEventListener('click', e => { e.stopPropagation(); select(path, e) })
+  node.addEventListener('contextmenu', e => {
+    e.stopPropagation()
+    if (!state.selection.has(path)) select(path, {})
+    itemMenu(e)
+  })
+  node.addEventListener('dragstart', e => {
+    e.preventDefault()
+    if (!state.selection.has(path)) select(path, {})
+    const src = node.querySelector('img')?.src
+    api.drag(selectedInOrder(), src?.startsWith('data:') ? src : null)
+  })
+}
+
+function select(path, e) {
+  const sel = state.selection
+  if (e.shiftKey && state.anchor) {
+    const all = visiblePaths()
+    const [from, to] = [all.indexOf(state.anchor), all.indexOf(path)].sort((a, b) => a - b)
+    if (!e.ctrlKey) sel.clear()
+    all.slice(from, to + 1).forEach(p => sel.add(p))
+  } else if (e.ctrlKey) {
+    sel.has(path) ? sel.delete(path) : sel.add(path)
+    state.anchor = path
+  } else {
+    state.selection = new Set([path])
+    state.anchor = path
+  }
+  paintSelection()
+}
+
+function clearSelection() {
+  state.selection.clear()
+  paintSelection()
+}
+
+function paintSelection() {
+  $$('#main [data-path]').forEach(n => n.classList.toggle('sel', state.selection.has(n.dataset.path)))
+}
+
+/* ========== file operations ========== */
+
+const droppedPaths = e => [...e.dataTransfer.files].map(f => api.pathFor(f)).filter(Boolean)
+
+function dropTarget(node, dir) {
+  node.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); node.classList.add('target') })
+  node.addEventListener('dragleave', () => node.classList.remove('target'))
+  node.addEventListener('drop', async e => {
+    e.preventDefault()
+    e.stopPropagation()
+    node.classList.remove('target')
+    const paths = droppedPaths(e)
+    if (paths.length) { await call('move', paths, dir); refresh() }
+  })
+}
+
+/*
+ * Ordering is persisted in the file names ("01_name.jpg") so it survives outside the app.
+ * label replaces the original stem; without it an existing numeric prefix is swapped.
+ */
+const counter = (i, total) => String(i + 1).padStart(Math.max(2, String(total).length), '0')
+function renumber(paths, label) {
+  return call('renameMany', paths.map((p, i) => {
+    const name = baseName(p)
+    const dot = name.lastIndexOf('.')
+    const ext = dot > 0 ? name.slice(dot) : ''
+    const stem = dot > 0 ? name.slice(0, dot) : name
+    const rest = label ?? stem.replace(/^\d+(_|$)/, '')
+    return [p, counter(i, paths.length) + (rest ? '_' + rest : '') + ext]
+  }))
+}
+
+async function reorder(dir, moving, target, insertAfter) {
+  if (moving.includes(target)) return
+  const order = sorted((await list(dir)).files).map(f => f.path).filter(p => !moving.includes(p))
+  order.splice(order.indexOf(target) + (insertAfter ? 1 : 0), 0, ...moving)
+  await renumber(order)
+  state.selection.clear()
+  if (state.sort !== 'name') setSort('name')
+}
+
+async function renameSelection() {
+  const paths = selectedInOrder()
+  if (paths.length === 1) {
+    const name = await ask('Nuovo nome', baseName(paths[0]), true)
+    if (name && name !== baseName(paths[0])) {
+      await call('renameMany', [[paths[0], name.trim()]])
+      if (samePath(paths[0], state.focus)) setFocus(joinPath(parentDir(paths[0]), name.trim()))
+    }
+  } else if (paths.length > 1) {
+    if (new Set(paths.map(p => parentDir(p).toLowerCase())).size > 1) {
+      return toast('Per numerare seleziona elementi della stessa cartella')
+    }
+    const label = await ask(`Nome base per ${paths.length} elementi, numerati nell'ordine a schermo (vuoto = solo numeri)`)
+    if (label === null) return
+    await renumber(paths, label.trim())
+  }
+  state.selection.clear()
+  refresh()
+}
+
+async function trashSelection() {
+  await call('trash', selectedInOrder())
+  state.selection.clear()
+  refresh()
+}
+
+async function setMeta(paths, op) {
+  await call('setMeta', paths, op)
+  await render()
+}
+
+async function newFolder() {
+  const name = await ask('Nome della nuova cartella', 'Nuova cartella')
+  if (name) { await call('mkdir', state.cwd, name.trim()); refresh() }
+}
+
+const isPinned = p => pins.some(x => samePath(x.path, p))
+function togglePin(p) {
+  pins = isPinned(p) ? pins.filter(x => !samePath(x.path, p)) : [...pins, { name: baseName(p), path: p }]
+  store.set('pins', pins)
+  renderTree()
+}
+
+/* ========== context menu ========== */
+
+function showMenu(e, items) {
+  e.preventDefault()
+  const menu = $('#menu')
+  menu.replaceChildren()
+  for (const item of items.filter(Boolean)) {
+    if (item === '-') {
+      if (menu.lastChild && menu.lastChild.tagName !== 'HR') menu.append(el('hr'))
+      continue
+    }
+    const b = el('button', item.danger ? 'danger' : '')
+    if (item.dot) b.append(el('i', 'dot ' + item.dot))
+    b.append(el('span', '', item.label))
+    if (item.check) b.append(el('b', '', '✓'))
+    if (item.key) b.append(el('kbd', '', item.key))
+    b.onclick = () => { menu.hidden = true; item.run() }
+    menu.append(b)
+  }
+  if (menu.lastChild?.tagName === 'HR') menu.lastChild.remove()
+  menu.hidden = false
+  menu.style.left = Math.min(e.clientX, innerWidth - menu.offsetWidth - 8) + 'px'
+  menu.style.top = Math.min(e.clientY, innerHeight - menu.offsetHeight - 8) + 'px'
+}
+
+function itemMenu(e) {
+  const paths = selectedInOrder()
+  const single = paths.length === 1 ? paths[0] : null
+  const isFolder = single && $$('#main [data-folder].sel').length > 0
+  const metas = paths.map(p => state.meta[p] || {})
+  showMenu(e, [
+    single && { label: 'Apri', run: () => isFolder ? navigate(single) : call('open', single) },
+    isFolder && { label: 'Apri in una nuova scheda', run: () => newTab(single) },
+    single && { label: 'Mostra in Esplora file', run: () => call('reveal', single) },
+    isFolder && { label: isPinned(single) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(single) },
+    { label: single ? 'Rinomina…' : `Numera ${paths.length} elementi…`, key: 'F2', run: renameSelection },
+    ...activeExtensions().flatMap(x => x.menu ? ['-', ...x.menu(paths, metas)] : []),
+    '-',
+    { label: 'Sposta nel Cestino', key: 'Canc', danger: true, run: trashSelection },
+  ])
+}
+
+/* ========== input dialog ========== */
+
+function ask(label, value = '', selectStem = false) {
+  const dialog = $('#ask')
+  const input = $('#askInput')
+  $('#askLabel').textContent = label
+  input.value = value
+  dialog.returnValue = ''
+  dialog.showModal()
+  input.focus()
+  const dot = value.lastIndexOf('.')
+  if (selectStem && dot > 0) input.setSelectionRange(0, dot)
+  else input.select()
+  return new Promise(resolve => {
+    dialog.onclose = () => resolve(dialog.returnValue === 'ok' ? input.value : null)
+  })
+}
+
+/* ========== full-screen viewer ========== */
+
+let viewer = null
+const FADE_MS = 200
+const viewerOpen = () => $('#viewer').classList.contains('show')
+
+function openViewer(items, current) {
+  viewer = { items, index: items.findIndex(x => x.path === current.path) }
+  call('overlay', { color: '#000000', symbolColor: '#c9c9d4' })
+  showViewer()
+}
+
+function closeViewer() {
+  const box = $('#viewer')
+  box.classList.remove('show')
+  box.querySelector('video')?.pause()
+  syncWindowControls()
+  // Content is dropped only after the fade-out, unless the viewer was reopened meanwhile.
+  setTimeout(() => { if (!viewerOpen()) box.replaceChildren() }, FADE_MS)
+}
+
+function showViewer() {
+  const box = $('#viewer')
+  const file = viewer.items[viewer.index]
+  const isCurrent = () => viewer.items[viewer.index] === file
+  let media
+
+  if (file.type === 'video') {
+    media = Object.assign(el('video'), { src: fileUrl(file.path), controls: true, autoplay: true })
+  } else if (file.type === 'img') {
+    media = el('img')
+    // Chromium cannot decode HEIC; the Windows shell renders a full-size image for it.
+    if (/\.heic$/i.test(file.path)) call('thumb', file.path, 2560).then(url => { if (url && isCurrent()) media.src = url })
+    else media.src = fileUrl(file.path)
+  } else if (/\.pdf$/i.test(file.path)) {
+    media = Object.assign(el('iframe', 'doc'), { src: fileUrl(file.path) })
+  } else {
+    media = el('div', 'other')
+    call('peek', file.path, 500000).then(async text => {
+      if (!isCurrent()) return
+      if (text != null) return media.replaceWith(el('pre', 'textview', text))
+      const icon = Object.assign(el('img'), { src: (await call('icon', file.path)) || '' })
+      const open = el('button', 'primary', 'Apri con il programma predefinito')
+      open.onclick = () => call('open', file.path)
+      media.append(icon, el('div', 'name', file.name), open)
+    })
+  }
+
+  const hints = ['← → scorri', ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), 'Invio apri con programma', 'Esc chiudi']
+  const bar = el('div', 'viewer-bar')
+  bar.append(el('span', '', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
+  box.replaceChildren(media, bar)
+  box.classList.add('show')
+}
+
+function viewerKey(e) {
+  const step = { ArrowLeft: -1, ArrowRight: 1 }[e.key]
+  const file = viewer.items[viewer.index]
+  if (step) {
+    viewer.index = (viewer.index + step + viewer.items.length) % viewer.items.length
+    showViewer()
+  } else if (e.key === 'Escape') closeViewer()
+  else if (e.key === 'Enter') call('open', file.path)
+  else activeExtensions().some(x => x.viewer?.onKey?.(e, file.path))
+}
+
+/* ========== sidebar ========== */
+
+async function renderTree() {
+  const [favs, drives] = await Promise.all([
+    Promise.all(pins.map(p => treeNode(p.path, p.name, 0))),
+    Promise.all(state.drives.map(d => treeNode(d, `Disco (${d.slice(0, 2)})`, 0))),
+  ])
+  $('#favs').replaceChildren(...favs)
+  $('#pc').replaceChildren(...drives)
+}
+
+async function treeNode(dir, name, depth) {
+  const node = el('div', 'node')
+  const row = el('div', 'row' + (samePath(dir, state.cwd) ? ' active' : ''))
+  row.style.paddingLeft = 8 + depth * 14 + 'px'
+  const chev = el('span', 'chev', '›')
+  row.append(chev, el('span', 'label', name))
+  node.append(row)
+
+  if (treeExpanded.has(dir)) {
+    const folders = (await list(dir)).folders.sort(byName)
+    if (!folders.length) chev.classList.add('leaf')
+    else {
+      node.classList.add('open')
+      const children = el('div', 'kids')
+      children.append(...await Promise.all(folders.map(f => treeNode(f.path, f.name, depth + 1))))
+      node.append(children)
+    }
+  }
+
+  chev.onclick = e => {
+    e.stopPropagation()
+    treeExpanded.has(dir) ? treeExpanded.delete(dir) : treeExpanded.add(dir)
+    saveTree()
+    renderTree()
+  }
+  row.onclick = () => navigate(dir)
+  row.onauxclick = e => { if (e.button === 1) newTab(dir) }
+  row.oncontextmenu = e => showMenu(e, [
+    { label: 'Apri in una nuova scheda', run: () => newTab(dir) },
+    { label: 'Apri in Esplora file', run: () => call('open', dir) },
+    { label: isPinned(dir) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(dir) },
+  ])
+  hoverPreview(row, dir, name)
+  dropTarget(row, dir)
+  return node
+}
+
+/*
+ * Hovering a sidebar folder shows its first files without leaving the current folder, over a
+ * dimmed backdrop. Once the preview is up, moving to another folder swaps it instantly; a short
+ * grace period on leave avoids flashing the backdrop while the pointer crosses between rows.
+ */
+const PEEK_DELAY_MS = 350
+const PEEK_GRACE_MS = 120
+let peekToken = 0
+let peekHideTimer = null
+const peekOpen = () => $('#peek').classList.contains('show')
+
+function hoverPreview(row, dir, name) {
+  let timer
+  row.addEventListener('mouseenter', () => {
+    clearTimeout(peekHideTimer)
+    timer = setTimeout(() => showPeek(row, dir, name), peekOpen() ? 0 : PEEK_DELAY_MS)
+  })
+  row.addEventListener('mouseleave', () => {
+    clearTimeout(timer)
+    peekHideTimer = setTimeout(hidePeek, PEEK_GRACE_MS)
+  })
+  row.addEventListener('mousedown', hidePeek)
+}
+
+async function showPeek(row, dir, name) {
+  const token = ++peekToken
+  const data = await list(dir)
+  if (token !== peekToken) return
+  const peek = $('#peek')
+  const files = sorted(data.files).slice(0, 12)
+  const head = el('div', 'peek-head')
+  head.append(el('b', '', name), el('span', 'fcount', countLabel(data)))
+  const body = el('div', 'peek-grid')
+  body.append(...files.map(previewImg))
+  peek.replaceChildren(head, files.length ? body : el('p', 'hint', 'Nessun file da mostrare'))
+  const r = row.getBoundingClientRect()
+  peek.style.left = r.right + 12 + 'px'
+  peek.style.top = Math.max(8, Math.min(r.top - 8, innerHeight - peek.offsetHeight - 8)) + 'px'
+  peek.classList.add('show')
+  $('#dim').classList.add('show')
+}
+
+function hidePeek() {
+  peekToken++
+  $('#peek').classList.remove('show')
+  $('#dim').classList.remove('show')
+}
+
+function renderExtensionSidebar() {
+  const all = state.allMeta
+  $('#extside').replaceChildren(...activeExtensions().filter(x => x.sidebar).flatMap(x => {
+    const chips = el('div', 'chips')
+    chips.append(...x.sidebar(all))
+    return [el('h4', '', x.name), chips]
+  }))
+}
+
+/* ========== header: tabs and breadcrumbs ========== */
+
+function renderTabs() {
+  const strip = $('#tabs')
+  strip.replaceChildren(...tabs.map((tab, i) => {
+    const node = el('div', 'tab' + (i === tabIndex ? ' on' : ''))
+    const close = el('button', '', '×')
+    close.title = 'Chiudi scheda (Ctrl+W)'
+    close.onclick = e => { e.stopPropagation(); closeTab(i) }
+    node.append(el('span', '', baseName(tab.cwd)), close)
+    node.title = tab.cwd
+    node.onclick = () => switchTab(i)
+    node.onauxclick = e => { if (e.button === 1) closeTab(i) }
+    dropTarget(node, tab.cwd)
+    return node
+  }))
+  const add = el('button', 'new-tab', '+')
+  add.title = 'Nuova scheda (Ctrl+T)'
+  add.onclick = () => newTab(state.cwd)
+  strip.append(add)
+}
+
+function renderCrumbs() {
+  const crumbs = $('#crumbs')
+  crumbs.replaceChildren()
+  const parts = state.cwd.split('\\').filter(Boolean)
+  let path = ''
+  parts.forEach((name, i) => {
+    path = i ? joinPath(path, name) : name + '\\'
+    const target = path
+    const b = el('button', '', name)
+    b.onclick = () => navigate(target)
+    dropTarget(b, target)
+    crumbs.append(b)
+    if (i < parts.length - 1) crumbs.append(el('span', 'sep', '›'))
+  })
+}
+
+/* ========== navigation and tabs ========== */
+
+function navigate(dir, focus = null) {
+  Object.assign(currentTab(), { cwd: dir, focus })
+  saveTabs()
+  showTab()
+}
+
+// Going up keeps the folder we came from focused, so the list does not lose its place.
+function goUp() {
+  const from = state.cwd
+  if (!samePath(parentDir(from), from)) navigate(parentDir(from), from)
+}
+
+function showTab() {
+  const tab = currentTab()
+  state.cwd = tab.cwd
+  state.focus = tab.focus
+  extensions.forEach(x => x.filter?.reset())
+  state.selection.clear()
+  $('#folders').scrollTop = 0
+  call('watch', tab.cwd)
+  refresh()
+}
+
+function switchTab(i) {
+  tabIndex = (i + tabs.length) % tabs.length
+  saveTabs()
+  showTab()
+}
+
+function newTab(dir) {
+  tabs.splice(tabIndex + 1, 0, { cwd: dir, focus: null })
+  switchTab(tabIndex + 1)
+}
+
+function closeTab(i) {
+  if (tabs.length === 1) return
+  tabs.splice(i, 1)
+  if (i < tabIndex || tabIndex === tabs.length) tabIndex--
+  switchTab(tabIndex)
+}
+
+const refresh = () => Promise.all([renderTree(), render()])
+
+function setSort(value) {
+  state.sort = localStorage.sort = value
+  $('#sort').value = value
+  refresh()
+}
+
+/* ========== global events ========== */
+
+function bindEvents() {
+  const main = $('#main')
+  main.addEventListener('click', clearSelection)
+  main.addEventListener('contextmenu', e => showMenu(e, [
+    { label: 'Nuova cartella', run: newFolder },
+    { label: 'Apri in Esplora file', run: () => call('open', state.cwd) },
+    { label: isPinned(state.cwd) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(state.cwd) },
+  ]))
+
+  const contentPane = $('#content')
+  contentPane.addEventListener('dragover', e => e.preventDefault())
+  contentPane.addEventListener('drop', async e => {
+    e.preventDefault()
+    const paths = droppedPaths(e)
+    const dir = contentPane.dataset.path
+    if (paths.length && dir) { await call('move', paths, dir); refresh() }
+  })
+
+  // Without this, dropping a file outside a target would navigate the window to it.
+  document.addEventListener('dragover', e => e.preventDefault())
+  document.addEventListener('drop', e => e.preventDefault())
+
+  document.addEventListener('mousedown', e => { if (!$('#menu').contains(e.target)) $('#menu').hidden = true })
+
+  document.addEventListener('keydown', e => {
+    if ($('dialog[open]') || e.target.closest?.('input, select')) return
+    if (viewerOpen()) return viewerKey(e)
+
+    if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
+    if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); return closeTab(tabIndex) }
+    if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); return switchTab(tabIndex + (e.shiftKey ? -1 : 1)) }
+
+    const selected = selectedInOrder()
+    const fileSelected = selected.length === 1 && $$('#content .item.sel:not(.folder)').length === 1
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); moveFocus(e.key === 'ArrowDown' ? 1 : -1) }
+    else if (e.key === 'ArrowRight') enterFocus()
+    else if (e.key === 'ArrowLeft' || e.key === 'Backspace') goUp()
+    else if (e.key === 'Enter') {
+      if (fileSelected) $('#content .item.sel')?.dispatchEvent(new MouseEvent('dblclick'))
+      else enterFocus()
+    } else if (e.key === 'Delete' && selected.length) trashSelection()
+    else if (e.key === 'F2' && selected.length) renameSelection()
+    else if (e.key === 'a' && e.ctrlKey) {
+      e.preventDefault()
+      $$('#content [data-path]').forEach(n => state.selection.add(n.dataset.path))
+      paintSelection()
+    } else if (e.key === 'Escape') clearSelection()
+  })
+
+  $('#askInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); $('#ask').close('ok') }
+  })
+  $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
+  $('#settingsBtn').onclick = openSettings
+  $('#exportBtn').onclick = exportLibrary
+  $('#importBtn').onclick = importLibrary
+  $('#sort').onchange = e => setSort(e.target.value)
+  $('#q').oninput = e => {
+    state.query = e.target.value.trim().toLowerCase()
+    clearTimeout(state.queryTimer)
+    state.queryTimer = setTimeout(render, 200)
+  }
+  $('#size').oninput = e => { localStorage.size = e.target.value; applySize() }
+
+  systemDark.addEventListener('change', applyTheme)
+  api.onChanged(refresh)
+  // Picks up changes made by other programs while the window was in the background.
+  window.addEventListener('focus', refresh)
+}
+
+const applySize = () => document.body.style.setProperty('--size', $('#size').value + 'px')
+
+/* ========== startup ========== */
+
+// Runs after every extension script has registered itself.
+document.addEventListener('DOMContentLoaded', async () => {
+  applyTheme()
+  bindEvents()
+  const init = await call('init')
+  Object.assign(state, { places: init.places, drives: init.drives })
+  pins ??= init.places
+  $('#sort').value = state.sort
+  $('#size').value = localStorage.size || 170
+  applySize()
+
+  const saved = store.get('tabs', []).filter(t => t?.cwd)
+  const existing = (await call('items', saved.map(t => t.cwd))) || []
+  tabs = saved.filter(t => existing.some(i => samePath(i.path, t.cwd)))
+  tabIndex = Math.max(0, Math.min(store.get('tabIndex', 0), tabs.length - 1))
+  if (init.start) {
+    tabs.push({ cwd: init.start, focus: null })
+    tabIndex = tabs.length - 1
+  }
+  if (!tabs.length) tabs = [{ cwd: init.places[1].path, focus: null }]
+  showTab()
+})

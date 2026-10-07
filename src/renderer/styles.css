@@ -1,0 +1,429 @@
+/* ---------- design tokens ---------- */
+
+:root {
+  --size: 170px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --fast: .12s;
+  --normal: .2s;
+
+  --accent: #8b7bff;
+  --accent-2: #ff7ab6;
+  --danger: #f87171;
+  --on-accent: #fff;
+
+  --status-todo: #f5b041;
+  --status-done: #34d399;
+  --status-drop: #f87171;
+}
+
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d0d10;
+  --panel: #16161b;
+  --panel2: #1e1e25;
+  --line: #26262f;
+  --line-strong: #3a3a46;
+  --text: #ececf1;
+  --text-strong: #fff;
+  --text-soft: #cfcfd8;
+  --text-label: #bdbdc8;
+  --muted: #8c8c99;
+  --faint: #55555f;
+  --accent-soft: #8b7bff26;
+  --accent-faint: #8b7bff14;
+  --hover: #ffffff08;
+  --hover-strong: #ffffff12;
+  --scrollbar: #2a2a33;
+  --surface: #1c1c23f0;
+  --shadow: 0 12px 40px #0008;
+  --backdrop: #0009;
+  --dim: #000000a6;
+  --placeholder: #3a3a46;
+  --switch-off: #33333d;
+  --toast-bg: #2a1c1f;
+  --overlay-symbols: #c9c9d4;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --accent: #6d5dfc;
+  --bg: #f5f5f8;
+  --panel: #ffffff;
+  --panel2: #ececf2;
+  --line: #e1e1e8;
+  --line-strong: #c9c9d3;
+  --text: #1b1b22;
+  --text-strong: #000;
+  --text-soft: #34343e;
+  --text-label: #4a4a55;
+  --muted: #6c6c78;
+  --faint: #a6a6b1;
+  --accent-soft: #6d5dfc1f;
+  --accent-faint: #6d5dfc12;
+  --hover: #0000000a;
+  --hover-strong: #00000010;
+  --scrollbar: #c8c8d1;
+  --surface: #fffffff2;
+  --shadow: 0 12px 40px #1b1b2224;
+  --backdrop: #1b1b2266;
+  --dim: #12121a59;
+  --placeholder: #d3d3dc;
+  --switch-off: #d0d0d9;
+  --toast-bg: #fff1f1;
+  --overlay-symbols: #3a3a44;
+}
+
+@keyframes fade-in { from { opacity: 0 } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.97) translateY(4px) } }
+@keyframes rise-in { from { opacity: 0; transform: translate(-50%, 8px) } }
+@keyframes zoom-in { from { opacity: 0; transform: scale(.985) } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::backdrop { animation: none !important; transition: none !important }
+}
+
+/* ---------- base ---------- */
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  display: grid;
+  grid-template: 40px 48px 1fr / 250px 1fr;
+  grid-template-areas: "titlebar titlebar" "toolbar toolbar" "side main";
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  transition: background-color var(--normal), color var(--normal);
+}
+
+input, select, button { font: inherit; color: inherit }
+button, .row, .frow, .item, .chip, .tab, #toolbar, #side, #folders, .sec {
+  transition: background-color var(--fast), color var(--fast), border-color var(--fast), box-shadow var(--fast), opacity var(--fast);
+}
+::-webkit-scrollbar { width: 10px; height: 10px }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 10px; border: 2px solid var(--bg) }
+
+.hint { margin: 0; font-size: 12px; color: var(--muted) }
+.primary { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--on-accent) !important }
+
+/* ---------- title bar with tabs ---------- */
+
+#titlebar {
+  grid-area: titlebar;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 0 150px 0 14px; /* room for the native window controls */
+  -webkit-app-region: drag;
+}
+
+.brand { font-weight: 600; color: var(--text-strong); white-space: nowrap }
+.brand::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+#tabs { display: flex; align-items: flex-end; align-self: stretch; gap: 2px; min-width: 0; padding-top: 6px }
+.tab {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 200px;
+  height: 34px;
+  padding: 0 6px 0 14px;
+  border-radius: 9px 9px 0 0;
+  color: var(--muted);
+}
+.tab:hover { background: var(--hover); color: var(--text) }
+.tab.on { background: var(--panel); color: var(--text) }
+.tab span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.tab button { flex: none; width: 20px; height: 20px; padding: 0; background: none; border: 0; border-radius: 5px; color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; cursor: pointer }
+.tab:hover button, .tab.on button { opacity: 1 }
+.tab button:hover { background: var(--hover-strong); color: var(--text) }
+.new-tab { -webkit-app-region: no-drag; align-self: center; width: 28px; height: 28px; margin-left: 4px; background: none; border: 0; border-radius: 7px; color: var(--muted); font-size: 18px; cursor: pointer }
+.new-tab:hover { background: var(--hover-strong); color: var(--text) }
+
+/* ---------- toolbar ---------- */
+
+#toolbar { grid-area: toolbar; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line) }
+
+#crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; margin-right: auto; overflow: hidden }
+#crumbs button { padding: 4px 8px; background: none; border: 0; border-radius: 6px; color: var(--muted); white-space: nowrap; cursor: pointer }
+#crumbs button:last-of-type { color: var(--text); font-weight: 600 }
+#crumbs button:hover { background: var(--panel2); color: var(--text) }
+.sep { color: var(--faint) }
+
+#q, #sort { padding: 5px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast) }
+#q { width: 220px }
+#q:focus { border-color: var(--accent) }
+#size { width: 90px; accent-color: var(--accent) }
+#settingsBtn { width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer }
+#settingsBtn:hover { background: var(--panel2); border-color: var(--line); color: var(--text) }
+
+/* ---------- sidebar ---------- */
+
+/* Stays above the hover backdrop, so the pointer can move between folders while it is shown. */
+#side { grid-area: side; position: relative; z-index: 16; display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; overflow: auto; background: var(--bg); border-right: 1px solid var(--line) }
+#side h4 { margin: 18px 8px 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+#side h4:first-child { margin-top: 6px }
+#extside { display: contents }
+
+.row { display: flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 7px; color: var(--text-soft); cursor: pointer }
+.row:hover { background: var(--panel) }
+.row.active { background: var(--panel2); color: var(--text-strong); box-shadow: inset 2px 0 var(--accent) }
+.label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+.chev { flex: none; width: 16px; text-align: center; font-size: 15px; line-height: 1; color: var(--muted); transition: transform var(--normal) var(--ease) }
+.chev.leaf { visibility: hidden }
+.node.open > .row .chev { transform: rotate(90deg) }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 6px }
+.chip { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; cursor: pointer }
+.chip:hover { border-color: var(--line-strong) }
+.chip small { color: var(--muted) }
+.chip.on { background: var(--accent-soft); border-color: var(--accent) }
+
+/* ---------- main view ---------- */
+
+#main { grid-area: main; display: flex; min-width: 0; min-height: 0 }
+#content { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 60px }
+#content > .hint { margin: 0 4px 12px }
+.empty { margin-top: 80px; text-align: center; color: var(--muted) }
+
+/* folder list on the left of the content pane */
+#folders { flex: none; width: 300px; overflow: auto; padding: 10px 8px; border-right: 1px solid var(--line) }
+.frow { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 10px; cursor: pointer }
+.frow + .frow { margin-top: 2px }
+.frow:hover { background: var(--panel) }
+.frow.focus { background: var(--panel2); box-shadow: inset 3px 0 var(--accent) }
+.frow.sel { background: var(--accent-soft) }
+.frow.dim .collage, .frow.dim .fname { opacity: .4 }
+.finfo { flex: 1; min-width: 0 }
+.finfo .badges { margin-top: 4px }
+.fname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.fcount { font-size: 12px; color: var(--muted); white-space: nowrap }
+
+/* 2x2 preview of a folder's first files */
+.collage {
+  flex: none;
+  display: grid;
+  grid-template: 1fr 1fr / 1fr 1fr;
+  gap: 2px;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--panel2);
+}
+.collage > :only-child { grid-area: 1 / 1 / 3 / 3 }
+.collage img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover }
+.collage img.icon { object-fit: contain; padding: 2px }
+.collage .paper { padding: 2px; font-size: 2px }
+.collage.empty::after { content: ""; grid-area: 1 / 1 / 3 / 3; place-self: center; width: 40%; height: 30%; border-radius: 3px; background: var(--placeholder) }
+
+.pane-head { display: flex; align-items: center; gap: 12px; margin: 0 4px 14px }
+.pane-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; min-width: 0 }
+.pane-title h2 { margin: 0; font-size: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.ghost { margin-left: auto; padding: 6px 12px; background: none; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); white-space: nowrap; cursor: pointer }
+.ghost:hover { background: var(--panel); color: var(--text) }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--size), 1fr)); gap: 12px; padding: 4px; border-radius: 12px }
+.item { padding: 6px; border-radius: 12px }
+.item:hover { background: var(--panel) }
+.item.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent) }
+.item.dim .thumb { opacity: .4 }
+.item.folder .collage { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0 }
+.item.folder .name { font-weight: 600; color: var(--text) }
+.item.folder .fcount { padding: 0 2px }
+.name { margin-top: 6px; padding: 0 2px; font-size: 12px; color: var(--text-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+
+.thumb { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 9px; background: var(--panel2) }
+.thumb img { display: block; width: 100%; height: 100%; object-fit: cover }
+.thumb img.icon { object-fit: none }
+.thumb .badges { position: absolute; top: 6px; left: 6px; right: 6px }
+img:not([src]) { visibility: hidden }
+img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
+
+/* text files render as a small sheet of paper */
+.paper {
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  overflow: hidden;
+  background: #f4f4f7;
+  color: #2a2a33;
+  font: 9px/1.35 Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  box-shadow: inset 0 0 0 1px #0000000d;
+}
+.paper:not(.instant) { animation: fade-in var(--normal) ease-out }
+
+.play { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 10px; color: #fff; background: #000a; backdrop-filter: blur(6px) }
+.badges { display: flex; flex-wrap: wrap; gap: 4px }
+.pill { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #111 }
+.tag { padding: 1px 7px; border-radius: 999px; font-size: 11px; color: #eee; background: #000a; backdrop-filter: blur(6px) }
+
+.ins-before { box-shadow: inset 3px 0 var(--accent) }
+.ins-after { box-shadow: inset -3px 0 var(--accent) }
+.target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-faint) }
+
+/* ---------- folder hover preview ---------- */
+
+#dim {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  background: var(--dim);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--normal) var(--ease), visibility 0s var(--normal);
+}
+#dim.show { opacity: 1; visibility: visible; transition-delay: 0s }
+
+#peek {
+  position: fixed;
+  z-index: 17;
+  width: 340px;
+  padding: 12px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-6px) scale(.98);
+  transform-origin: left top;
+  transition: opacity var(--normal) var(--ease), transform var(--normal) var(--ease), top var(--normal) var(--ease), visibility 0s var(--normal);
+}
+#peek.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s }
+.peek-head { display: flex; align-items: baseline; gap: 10px }
+.peek-head .hint, #peek > .hint { margin-top: 8px }
+.peek-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px }
+.peek-grid > * { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; background: var(--panel2) }
+.peek-grid .paper { padding: 3px; font-size: 3px }
+.peek-grid img.icon { object-fit: none }
+
+/* ---------- context menu ---------- */
+
+#menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 230px;
+  padding: 5px;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  transform-origin: left top;
+}
+#menu:not([hidden]) { animation: pop-in var(--fast) var(--ease) }
+#menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; background: none; border: 0; border-radius: 6px; text-align: left; cursor: pointer }
+#menu button:hover { background: var(--hover-strong) }
+#menu span { flex: 1 }
+#menu kbd { font: 11px inherit; color: var(--muted) }
+#menu .danger { color: var(--danger) }
+#menu hr { margin: 4px 2px; border: 0; border-top: 1px solid var(--line) }
+.dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50% }
+
+/* ---------- full-screen viewer (always dark, like a photo viewer) ---------- */
+
+#viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 20px 64px;
+  background: #000;
+  color: #ececf1;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--normal) var(--ease), visibility 0s var(--normal);
+}
+#viewer.show { opacity: 1; visibility: visible; transition-delay: 0s }
+#viewer.show > :first-child { animation: zoom-in .24s var(--ease) }
+#viewer img, #viewer video { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: 8px }
+#viewer .doc { width: min(1100px, 100%); height: 100%; background: #fff; border: 0; border-radius: 8px }
+#viewer .textview {
+  width: min(1100px, 100%);
+  height: 100%;
+  margin: 0;
+  padding: 24px 28px;
+  overflow: auto;
+  background: #16161b;
+  border: 1px solid #26262f;
+  border-radius: 8px;
+  font: 13px/1.55 Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+#viewer .other { display: flex; flex-direction: column; align-items: center; gap: 14px }
+#viewer .other img { width: 64px; height: 64px }
+#viewer .other .name { font-size: 15px; color: #ececf1 }
+#viewer .other button { padding: 8px 16px; border: 1px solid #26262f; border-radius: 8px; cursor: pointer }
+.viewer-bar { position: absolute; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; gap: 12px; color: #ddd }
+.viewer-bar .hint { margin-left: auto; color: #8c8c99 }
+
+/* ---------- dialogs ---------- */
+
+dialog { width: 440px; padding: 20px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow) }
+dialog[open] { animation: pop-in var(--normal) var(--ease) }
+dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px) }
+dialog[open]::backdrop { animation: fade-in var(--normal) ease-out }
+dialog h3 { margin: 0 0 6px; font-size: 16px }
+dialog h3.section { margin-top: 22px }
+dialog > form > label { display: block; margin-bottom: 10px; color: var(--muted) }
+dialog input:not([type]) { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; user-select: text; transition: border-color var(--fast) }
+dialog input:not([type]):focus { border-color: var(--accent) }
+dialog menu { display: flex; flex-direction: row-reverse; gap: 8px; margin: 16px 0 0; padding: 0 }
+dialog menu button { padding: 6px 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
+dialog .actions { display: flex; gap: 8px; margin-top: 12px }
+dialog .actions button { padding: 7px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
+dialog .actions button:hover { border-color: var(--muted) }
+
+#settings { width: 520px }
+
+.segmented { display: inline-flex; gap: 2px; margin-top: 10px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px }
+.segmented button { padding: 6px 16px; background: none; border: 0; border-radius: 7px; color: var(--muted); cursor: pointer }
+.segmented button:hover { color: var(--text) }
+.segmented button.on { background: var(--panel2); color: var(--text); box-shadow: 0 1px 2px #0000001a }
+
+#extList { display: flex; flex-direction: column; gap: 8px; margin-top: 14px }
+.ext-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; cursor: pointer }
+.ext-row > div { flex: 1 }
+.ext-row .hint { margin-top: 2px }
+.ext-row input { display: none }
+.switch { flex: none; position: relative; width: 36px; height: 20px; border-radius: 999px; background: var(--switch-off); transition: background-color var(--normal) var(--ease) }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; transition: transform var(--normal) var(--ease) }
+.ext-row input:checked + .switch { background: var(--accent) }
+.ext-row input:checked + .switch::after { transform: translateX(16px) }
+
+#toast { position: fixed; z-index: 30; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 16px; background: var(--toast-bg); border: 1px solid var(--danger); border-radius: 10px; box-shadow: var(--shadow) }
+#toast:not([hidden]) { animation: rise-in var(--normal) var(--ease) }
+
+/* ---------- Social extension ---------- */
+
+.dot.todo, .pill.todo { background: var(--status-todo) }
+.dot.done, .pill.done { background: var(--status-done) }
+.dot.drop, .pill.drop { background: var(--status-drop) }

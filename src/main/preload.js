@@ -1,0 +1,8 @@
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
+
+contextBridge.exposeInMainWorld('api', {
+  call: (name, ...args) => ipcRenderer.invoke(name, ...args),
+  drag: (paths, icon) => ipcRenderer.send('drag', paths, icon),
+  pathFor: file => webUtils.getPathForFile(file),
+  onChanged: fn => ipcRenderer.on('changed', fn),
+})

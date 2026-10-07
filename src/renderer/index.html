@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src file: data:; media-src file:">
+  <title>Explorer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="titlebar">
+    <div class="brand">Explorer</div>
+    <div id="tabs"></div>
+  </header>
+
+  <div id="toolbar">
+    <nav id="crumbs"></nav>
+    <input id="q" type="search" placeholder="Cerca…">
+    <select id="sort"><option value="name">Nome</option><option value="date">Più recenti</option></select>
+    <input id="size" type="range" min="110" max="320" value="170" title="Dimensione anteprime">
+    <button id="settingsBtn" title="Impostazioni">⚙</button>
+  </div>
+
+  <aside id="side">
+    <h4>Preferiti</h4><div id="favs"></div>
+    <h4>Questo PC</h4><div id="pc"></div>
+    <div id="extside"></div>
+  </aside>
+
+  <main id="main">
+    <div id="folders" hidden></div>
+    <div id="content"></div>
+  </main>
+
+  <div id="menu" hidden></div>
+  <div id="dim"></div>
+  <div id="peek"></div>
+  <div id="viewer"></div>
+
+  <dialog id="ask">
+    <form method="dialog">
+      <label id="askLabel" for="askInput"></label>
+      <input id="askInput" autocomplete="off">
+      <menu><button value="ok" class="primary">OK</button><button value="cancel">Annulla</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <h3>Aspetto</h3>
+      <div id="themePicker" class="segmented"></div>
+      <h3 class="section">Estensioni</h3>
+      <p class="hint">Attiva solo quelle che servono al tuo lavoro. Disattivarle non cancella i dati.</p>
+      <div id="extList"></div>
+      <h3 class="section">Dati</h3>
+      <p class="hint">Stati e tag dei file sono legati al loro contenuto: restano anche se i file vengono spostati o rinominati, e si possono condividere con chi ha gli stessi file.</p>
+      <div class="actions">
+        <button type="button" id="exportBtn">Esporta libreria…</button>
+        <button type="button" id="importBtn">Importa libreria…</button>
+      </div>
+      <menu><button value="ok" class="primary" autofocus>Fatto</button></menu>
+    </form>
+  </dialog>
+
+  <div id="toast" hidden></div>
+
+  <script src="app.js"></script>
+  <script src="extensions/social.js"></script>
+  <script src="extensions/tags.js"></script>
+</body>
+</html>
