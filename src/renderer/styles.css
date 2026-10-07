@@ -304,7 +304,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 }
 #dim.show { opacity: 1; visibility: visible; transition-delay: 0s }
 
-/* Read-only preview laid over the content area; the pointer stays on the sidebar. */
+/* Preview laid over the content area; entering it with the pointer opens the folder. */
 #peek {
   position: fixed;
   z-index: 17;
@@ -322,7 +322,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   transform: scale(.96);
   transition: opacity var(--normal) var(--ease), transform .26s var(--ease), visibility 0s var(--normal);
 }
-#peek.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s }
+#peek.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; pointer-events: auto; cursor: pointer }
 /* fade out the last row instead of cutting it */
 #peek::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(transparent, var(--bg)) }
 .peek-head { display: flex; align-items: baseline; gap: 12px; margin: 0 4px 14px }

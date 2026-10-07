@@ -755,12 +755,12 @@ async function treeNode(dir, name, depth) {
 
 /*
  * Hovering a sidebar folder previews it over the content area, at nearly the size it would have
- * once opened, on a dimmed backdrop. The folder already open is not previewed. Once a preview is
- * up, moving to another folder swaps it instantly; a short grace period on leave avoids flashing
- * the backdrop while the pointer crosses between rows.
+ * once opened, on a dimmed backdrop. Moving the pointer onto the preview opens that folder.
+ * The folder already open is not previewed. Once a preview is up, moving to another folder swaps
+ * it instantly; the grace period on leave keeps it up while the pointer travels to it.
  */
 const PEEK_DELAY_MS = 350
-const PEEK_GRACE_MS = 120
+const PEEK_GRACE_MS = 300
 const PEEK_MARGIN = 24
 const PEEK_MAX_ITEMS = 60
 let peekToken = 0
@@ -796,6 +796,7 @@ async function showPeek(dir, name) {
     : el('p', 'empty', 'Cartella vuota')
 
   const peek = $('#peek')
+  peek.dataset.dir = dir
   peek.replaceChildren(head, body)
   const area = $('#main').getBoundingClientRect()
   Object.assign(peek.style, {
@@ -808,7 +809,15 @@ async function showPeek(dir, name) {
   $('#dim').classList.add('show')
 }
 
+function openPeekedFolder() {
+  if (!peekOpen()) return
+  const dir = $('#peek').dataset.dir
+  hidePeek()
+  navigate(dir)
+}
+
 function hidePeek() {
+  clearTimeout(peekHideTimer)
   peekToken++
   $('#peek').classList.remove('show')
   $('#dim').classList.remove('show')
@@ -967,6 +976,7 @@ function bindEvents() {
     if (e.key === 'Enter') { e.preventDefault(); $('#ask').close('ok') }
   })
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
+  $('#peek').addEventListener('mouseenter', openPeekedFolder)
   $('#settingsBtn').onclick = openSettings
   $('#exportBtn').onclick = exportLibrary
   $('#importBtn').onclick = importLibrary
