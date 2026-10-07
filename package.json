@@ -1,7 +1,7 @@
 {
   "name": "devxplorer",
   "productName": "DevXplorer",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "File manager with inline folder previews, ordering and pluggable workflow extensions",
   "author": "0xDevDav",
   "license": "MIT",
