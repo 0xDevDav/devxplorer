@@ -1040,7 +1040,9 @@ const viewerOpen = () => $('#viewer').classList.contains('show')
 
 function openViewer(items, current) {
   viewer = { items, index: items.findIndex(x => x.path === current.path) }
-  call('overlay', { color: '#000000', symbolColor: '#c9c9d4' })
+  // With the glass material the controls stay transparent over the black viewer: Windows does not
+  // clear an opaque overlay color when switching back to transparent, which left a black block.
+  call('overlay', { color: glassOn() ? '#00000000' : '#000000', symbolColor: '#c9c9d4' })
   showViewer()
 }
 
