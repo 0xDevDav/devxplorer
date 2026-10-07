@@ -399,7 +399,12 @@ const previewObserver = new IntersectionObserver(entries => entries.forEach(asyn
 // Shortcuts carry the arrow badge Windows draws on them.
 function appIcon(path, src) {
   const node = el('div', 'app-icon' + (SHORTCUT_EXT.test(path) ? ' shortcut' : ''))
-  node.append(Object.assign(el('img'), { src, draggable: false }))
+  const glyph = el('span', 'glyph')
+  const img = Object.assign(el('img'), { src, draggable: false })
+  // Shell icons come at 32 or 48px; they stay at their size instead of being blown up.
+  img.onload = () => glyph.classList.toggle('native', img.naturalWidth <= 48)
+  glyph.append(img)
+  node.append(glyph)
   return node
 }
 

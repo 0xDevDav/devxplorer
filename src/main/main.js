@@ -5,6 +5,7 @@ const fsp = fs.promises
 const path = require('path')
 const library = require('./library')
 const exif = require('./exif')
+const icons = require('./icons')
 const recycle = require('./recycle')
 const shellIntegration = require('./shell-integration')
 const { pickLanguage, translator } = require('../shared/messages')
@@ -190,13 +191,31 @@ const handlers = {
     } catch { return null }
   },
 
-  // Icon of a program or shortcut, as Windows shows it; a .lnk shows the icon of its target.
-  // ponytail: getFileIcon stops at 48px on Windows; jumbo 256px icons need the shell image list (native code).
+  /*
+   * Icon of a program or shortcut, as Windows shows it: a .lnk uses its icon location or its
+   * target. Executables give their largest embedded icon; anything else falls back to the shell icon.
+   */
   async appIcon(p) {
-    let target = p
-    if (/\.lnk$/i.test(p)) try { target = shell.readShortcutLink(p).target || p } catch {}
+    let source = p
+    let index = 0
+    if (/\.lnk$/i.test(p)) {
+      try {
+        const link = shell.readShortcutLink(p)
+        source = link.icon || link.target || p
+        index = link.icon ? link.iconIndex : 0
+      } catch {}
+      source = source.replace(/%([^%]+)%/g, (m, name) => process.env[name] ?? m)
+    }
+    if (/\.ico$/i.test(source)) {
+      const data = await fsp.readFile(source).catch(() => null)
+      if (data) return 'data:image/x-icon;base64,' + data.toString('base64')
+    }
+    if (/\.(exe|dll)$/i.test(source)) {
+      const url = await icons.exeIcon(source, index)
+      if (url) return url
+    }
     try {
-      const img = await app.getFileIcon(target, { size: 'large' })
+      const img = await app.getFileIcon(source, { size: 'large' })
       return img.isEmpty() ? null : img.toDataURL()
     } catch { return null }
   },
