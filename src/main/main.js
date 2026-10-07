@@ -86,19 +86,15 @@ async function describe(p) {
   }
 }
 
-let win = null
+let lastWindow = null // the window to reuse when the app is launched again
 let chrome = null
-let viewerOpen = false
 let quitting = false
 app.on('before-quit', () => { quitting = true })
 // Error messages and dialogs follow the language the renderer reports (system locale until then).
 let t = translator('en')
 let currentLanguage = null
 let appearance = null
-let watcher = null
-let watchTimer = null
 
-// Rename when possible; across drives fall back to copy and delete.
 const FOLDER_SIZE_TTL = 60000
 const folderSizes = new Map()
 
@@ -170,33 +166,38 @@ async function searchTree(dir, query, showHidden) {
 }
 
 const handlers = {
-  init: async () => ({
+  // The first window restores the saved tabs; later ones open on their own folder only.
+  async init() {
+    return {
+    secondary: !!this.startFolder,
     supportsGlass: SUPPORTS_MICA,
-    start: folderArgument(process.argv),
+    start: this.startFolder ?? folderArgument(process.argv),
     places: ['desktop', 'pictures', 'videos', 'documents', 'downloads'].map(kind => ({ path: app.getPath(kind), kind })),
     drives: await connectedDrives(),
-  }),
+    }
+  },
 
-  // Watches only the current folder: a recursive watch on a whole drive is too expensive.
+  // Watches only the window's current folder: a recursive watch on a whole drive is too expensive.
   watch(dir) {
-    watcher?.close()
+    const win = this
+    win.watcher?.close()
     try {
       // The folder going away (deleted, drive removed) shows up as an error or as a flood of events
       // naming the folder itself; watching stops and the renderer moves to a folder that exists.
       const gone = () => {
         current.close()
-        if (watcher !== current) return
-        watcher = null
-        clearTimeout(watchTimer)
-        win?.webContents.send('changed')
+        if (win.watcher !== current) return
+        win.watcher = null
+        clearTimeout(win.watchTimer)
+        if (!win.isDestroyed()) win.webContents.send('changed')
       }
-      const current = watcher = fs.watch(dir, (event, name) => {
+      const current = win.watcher = fs.watch(dir, (event, name) => {
         if (name && path.isAbsolute(name)) return gone()
-        clearTimeout(watchTimer)
-        watchTimer = setTimeout(() => win?.webContents.send('changed'), 300)
+        clearTimeout(win.watchTimer)
+        win.watchTimer = setTimeout(() => { if (!win.isDestroyed()) win.webContents.send('changed') }, 300)
       })
       current.on('error', gone)
-    } catch { watcher = null }
+    } catch { win.watcher = null }
   },
 
   // The folder itself or its closest existing parent; the home folder when the whole drive is gone.
@@ -268,13 +269,13 @@ const handlers = {
   },
 
   async exportLibrary() {
-    const r = await dialog.showSaveDialog(win, { defaultPath: t('library.defaultName'), filters: libraryFilter() })
+    const r = await dialog.showSaveDialog(this, { defaultPath: t('library.defaultName'), filters: libraryFilter() })
     if (r.canceled) return null
     return library.exportTo(r.filePath)
   },
 
   async importLibrary() {
-    const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: libraryFilter() })
+    const r = await dialog.showOpenDialog(this, { properties: ['openFile'], filters: libraryFilter() })
     if (r.canceled) return null
     return library.importFrom(r.filePaths[0])
   },
@@ -340,12 +341,12 @@ const handlers = {
    * for the theme and the viewer. Theme colors are remembered to open the next window without a flash.
    */
   overlay({ color, symbolColor, remember }) {
-    win.setTitleBarOverlay({ color, symbolColor })
+    this.setTitleBarOverlay({ color, symbolColor })
     if (remember) chrome = { color, symbolColor }
   },
 
   // Keeps system-drawn surfaces (Mica, native dialogs) in the app's theme and toggles the glass material.
-  setViewerOpen(open) { viewerOpen = !!open },
+  setViewerOpen(open) { this.viewerOpen = !!open },
 
   copyText: text => clipboard.writeText(text),
 
@@ -367,9 +368,14 @@ const handlers = {
     appearance = { theme, glass: SUPPORTS_MICA && glass }
     nativeTheme.themeSource = theme
     if (!SUPPORTS_MICA) return
-    if (appearance.glass) win.setBackgroundColor(TRANSPARENT)
-    win.setBackgroundMaterial(appearance.glass ? 'mica' : 'none')
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (appearance.glass) win.setBackgroundColor(TRANSPARENT)
+      win.setBackgroundMaterial(appearance.glass ? 'mica' : 'none')
+    }
   },
+
+  // Another window on a folder, next to this one.
+  newWindow(dir) { createWindow(dir, this) },
 
   open: p => shell.openPath(p),
   reveal: p => shell.showItemInFolder(p),
@@ -443,9 +449,18 @@ const handlers = {
     await fsp.mkdir(target)
     return target
   },
+
+  // An empty file; never replaces an existing one.
+  async newFile(dir, name) {
+    checkName(name)
+    const target = uniquePath(path.join(dir, name))
+    await fsp.writeFile(target, '', { flag: 'wx' })
+    return target
+  },
 }
 
-for (const [name, fn] of Object.entries(handlers)) ipcMain.handle(name, (e, ...args) => fn(...args))
+// Handlers run with `this` set to the window that called them.
+for (const [name, fn] of Object.entries(handlers)) ipcMain.handle(name, (e, ...args) => fn.apply(BrowserWindow.fromWebContents(e.sender), args))
 
 // A folder passed on the command line (e.g. from a shell "Open with" entry) wins over the last session.
 // Explorer passes a drive root as "C:\", whose \" Windows reads as an escaped quote: C:" comes
@@ -460,10 +475,12 @@ function folderArgument(argv) {
 // How Windows should start the app: the packaged executable, or Electron with the project path.
 const launchCommand = () => app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]
 
-// A single window: launching again (e.g. from File Explorer) opens the folder in a new tab.
+// One app instance: launching again (e.g. from File Explorer) opens the folder in a new tab of the
+// window used last.
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', (e, argv) => {
-  if (!win) return
+  const win = BrowserWindow.getFocusedWindow() || lastWindow
+  if (!win || win.isDestroyed()) return
   if (win.isMinimized()) win.restore()
   win.focus()
   const folder = folderArgument(argv)
@@ -477,19 +494,17 @@ ipcMain.on('drag', (e, paths, icon) => {
   e.sender.startDrag({ file: paths[0], files: paths, icon: img })
 })
 
-app.whenReady().then(() => {
-  t = translator(pickLanguage(app.getLocale()))
-  fs.mkdirSync(DATA_DIR, { recursive: true })
-  library.open(path.join(DATA_DIR, 'library.db'))
-  Menu.setApplicationMenu(null)
+/*
+ * Opens a window on startFolder (null: the first window, which restores the saved tabs). A window
+ * opened from another one cascades from its position.
+ */
+function createWindow(startFolder = null, from = null) {
   const saved = readJson(WINDOW_FILE, {})
-  chrome = saved.chrome ?? { color: BG, symbolColor: SYMBOLS }
-  appearance = saved.appearance ?? { theme: 'system', glass: SUPPORTS_MICA }
-  nativeTheme.themeSource = appearance.theme
-  win = new BrowserWindow({
+  const bounds = from ? { ...from.getNormalBounds(), x: from.getNormalBounds().x + 30, y: from.getNormalBounds().y + 30 } : saved.bounds
+  const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    ...saved.bounds,
+    ...bounds,
     title: app.getName(),
     icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
     backgroundColor: appearance.glass ? TRANSPARENT : chrome.color,
@@ -500,7 +515,10 @@ app.whenReady().then(() => {
       preload: path.join(__dirname, 'preload.js'),
     },
   })
-  if (saved.maximized) win.maximize()
+  win.startFolder = startFolder
+  lastWindow = win
+  win.on('focus', () => { lastWindow = win })
+  if (!from && saved.maximized) win.maximize()
   // The window only ever shows the app: no new windows, and no navigation away (a file dropped
   // outside a drop zone would otherwise replace the page).
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -510,15 +528,28 @@ app.whenReady().then(() => {
   // Windows session must never be held back by this.
   win.on('session-end', () => { quitting = true })
   win.on('close', e => {
-    if (viewerOpen && !quitting) {
+    if (win.viewerOpen && !quitting) {
       e.preventDefault()
       win.webContents.send('close-viewer')
       return
     }
+    win.watcher?.close()
     writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome, appearance })
   })
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
-  win.webContents.once('did-finish-load', () => library.prune().catch(() => {}))
+  return win
+}
+
+app.whenReady().then(() => {
+  t = translator(pickLanguage(app.getLocale()))
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+  library.open(path.join(DATA_DIR, 'library.db'))
+  Menu.setApplicationMenu(null)
+  const saved = readJson(WINDOW_FILE, {})
+  chrome = saved.chrome ?? { color: BG, symbolColor: SYMBOLS }
+  appearance = saved.appearance ?? { theme: 'system', glass: SUPPORTS_MICA }
+  nativeTheme.themeSource = appearance.theme
+  createWindow().webContents.once('did-finish-load', () => library.prune().catch(() => {}))
 })
 
 app.on('window-all-closed', () => {

@@ -145,7 +145,13 @@ let tabs = []
 let tabIndex = 0
 const currentTab = () => tabs[tabIndex]
 // History (back/forward) belongs to the session; only each tab's folder is remembered.
-const saveTabs = () => { store.set('tabs', tabs.map(({ cwd, focus }) => ({ cwd, focus }))); store.set('tabIndex', tabIndex) }
+// Only the first window's tabs are remembered; windows opened later are for the moment at hand.
+let secondaryWindow = false
+const saveTabs = () => {
+  if (secondaryWindow) return
+  store.set('tabs', tabs.map(({ cwd, focus }) => ({ cwd, focus })))
+  store.set('tabIndex', tabIndex)
+}
 
 async function call(name, ...args) {
   try {
@@ -413,6 +419,7 @@ const SHORTCUTS = [
   ['keys.group.tabs', [
     ['Ctrl+T', 'keys.newTab'],
     ['Ctrl+W', 'keys.closeTab'],
+    ['Ctrl+N', 'menu.openNewWindow'],
     ['Ctrl+Tab|Ctrl+Shift+Tab', 'keys.switchTab'],
   ]],
   ['keys.group.files', [
@@ -429,6 +436,7 @@ const SHORTCUTS = [
     ['Alt+key.drag', 'keys.reorder'],
     ['Ctrl+Z', 'keys.undo'],
     ['Ctrl+A', 'keys.selectAll'],
+    ['Ctrl+Shift+I', 'menu.invertSelection'],
     ['Esc', 'keys.deselect'],
   ]],
   ['keys.group.view', [
@@ -1352,6 +1360,24 @@ async function setMeta(paths, op) {
   await render()
 }
 
+async function newTextFile() {
+  const name = await ask(t('file.newPrompt'), t('file.newDefault'), true)
+  if (!name) return
+  const created = await call('newFile', state.cwd, name.trim())
+  if (!created) return
+  pushUndo('action.newFile', () => batchSucceeded(call('trash', [created])))
+  await refresh()
+  state.selection = new Set([created])
+  paintSelection()
+}
+
+// Selects every shown item that is not selected, and deselects the others.
+function invertSelection() {
+  const all = renderedItems().content.map(n => n.dataset.path)
+  state.selection = new Set(all.filter(p => !state.selection.has(p)))
+  paintSelection()
+}
+
 async function newFolder() {
   const name = await ask(t('folder.newPrompt'), t('folder.newDefault'))
   if (!name) return
@@ -1429,6 +1455,7 @@ function itemMenu(e) {
   showMenu(e, [
     single && { label: t('menu.open'), run: () => isFolder ? navigate(single) : call('open', single) },
     isFolder && { label: t('menu.openNewTab'), run: () => newTab(single) },
+    isFolder && { label: t('menu.openNewWindow'), run: () => call('newWindow', single) },
     single && !isFolder && { label: t('menu.openWith'), run: () => call('openWith', single) },
     RUNNABLE_EXT.test(ext) && { label: t('menu.runAsAdmin'), run: () => call('runAsAdmin', single) },
     '-',
@@ -1852,6 +1879,7 @@ function placeButton(dir, name, kind) {
   b.onauxclick = e => { if (e.button === 1) newTab(dir) }
   b.oncontextmenu = e => showMenu(e, [
     { label: t('menu.openNewTab'), run: () => newTab(dir) },
+    { label: t('menu.openNewWindow'), run: () => call('newWindow', dir) },
     { label: t('menu.openInExplorer'), run: () => call('open', dir) },
     { label: t('menu.terminal'), run: () => call('openTerminal', dir) },
     { label: t('menu.copyPath'), run: () => copyPaths([dir]) },
@@ -2282,6 +2310,8 @@ function bindEvents() {
   main.addEventListener('contextmenu', e => showMenu(e, [
     clipboard && { label: t('menu.paste'), key: 'Ctrl+V', run: paste },
     { label: t('menu.newFolder'), run: newFolder },
+    { label: t('menu.newFile'), run: newTextFile },
+    { label: t('menu.invertSelection'), key: 'Ctrl+Shift+I', run: invertSelection },
     '-',
     { label: t('menu.terminal'), run: () => call('openTerminal', state.cwd) },
     hasVsCode && { label: t('menu.vscode'), run: () => call('openInVsCode', [state.cwd]) },
@@ -2344,9 +2374,11 @@ function bindEvents() {
 
     if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette() }
     if (e.ctrlKey && (e.code === 'Digit1' || e.code === 'Digit2')) { e.preventDefault(); return setView(e.code === 'Digit1' ? 'icons' : 'list') }
-    if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); return showItemInfo(selectedInOrder()) }
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); return showItemInfo(selectedInOrder()) }
     if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); return editPath() }
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
+    if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'n') { e.preventDefault(); return call('newWindow', state.cwd) }
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); return invertSelection() }
     if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); return closeTab(tabIndex) }
     if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); return switchTab(tabIndex + (e.shiftKey ? -1 : 1)) }
 
@@ -2558,7 +2590,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderControls()
   applySizes()
 
-  const saved = store.get('tabs', []).filter(tab => tab?.cwd)
+  secondaryWindow = init.secondary
+  const saved = secondaryWindow ? [] : store.get('tabs', []).filter(tab => tab?.cwd)
   const existing = (await call('items', saved.map(tab => tab.cwd))) || []
   tabs = saved.filter(tab => existing.some(i => samePath(i.path, tab.cwd)))
   tabIndex = Math.max(0, Math.min(store.get('tabIndex', 0), tabs.length - 1))
