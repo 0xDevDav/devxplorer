@@ -2088,6 +2088,8 @@ function bindEvents() {
       if (step !== undefined) { e.preventDefault(); return resizeSection(pointerSection, step) }
     }
     if (e.target.closest?.('input, select')) return
+    // Any key closes an open menu, as on macOS, so it never lingers while the key acts on files.
+    $('#menu').hidden = true
     if (viewerOpen()) return viewerKey(e)
 
     const clipboardKey = e.ctrlKey && !e.shiftKey && !e.altKey && {
