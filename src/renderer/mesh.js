@@ -241,4 +241,57 @@ async function parse3mf(bytes) {
   return new Float32Array(out)
 }
 
-if (typeof module !== 'undefined') module.exports = { MESH_EXT, parseMesh, parseStl, parseObj, parsePly, parse3mf }
+/* ---------- preparation ---------- */
+
+/*
+ * Re-orients Z-up models to the viewer's Y-up, centres them and computes face normals. Works on
+ * the flat arrays directly: models can have millions of vertices.
+ */
+function prepareMesh(mesh) {
+  const src = mesh.positions
+  const positions = new Float32Array(src.length)
+  const min = [Infinity, Infinity, Infinity]
+  const max = [-Infinity, -Infinity, -Infinity]
+  for (let i = 0; i < src.length; i += 3) {
+    const x = src[i], y = mesh.zUp ? src[i + 2] : src[i + 1], z = mesh.zUp ? -src[i + 1] : src[i + 2]
+    positions[i] = x; positions[i + 1] = y; positions[i + 2] = z
+    if (x < min[0]) min[0] = x; if (x > max[0]) max[0] = x
+    if (y < min[1]) min[1] = y; if (y > max[1]) max[1] = y
+    if (z < min[2]) min[2] = z; if (z > max[2]) max[2] = z
+  }
+  const center = min.map((v, k) => (v + max[k]) / 2)
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] -= center[0]; positions[i + 1] -= center[1]; positions[i + 2] -= center[2]
+  }
+
+  const normals = new Float32Array(positions.length)
+  for (let i = 0; i < positions.length; i += 9) {
+    const ax = positions[i + 3] - positions[i], ay = positions[i + 4] - positions[i + 1], az = positions[i + 5] - positions[i + 2]
+    const bx = positions[i + 6] - positions[i], by = positions[i + 7] - positions[i + 1], bz = positions[i + 8] - positions[i + 2]
+    let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx
+    const length = Math.hypot(nx, ny, nz) || 1
+    nx /= length; ny /= length; nz /= length
+    for (let v = 0; v < 9; v += 3) { normals[i + v] = nx; normals[i + v + 1] = ny; normals[i + v + 2] = nz }
+  }
+
+  const extent = max.map((v, k) => v - min[k])
+  // The size as stored in the file: Z-up models swap their Y and Z extents back.
+  const size = mesh.zUp ? [extent[0], extent[2], extent[1]] : extent
+  return {
+    positions,
+    normals,
+    triangles: positions.length / 9,
+    radius: Math.max(Math.hypot(...extent) / 2, 1e-6),
+    ground: -extent[1] / 2,
+    size,
+    units: mesh.units,
+  }
+}
+
+// Parses and prepares a model; null when the file holds no triangles (e.g. a compiler ".obj").
+async function loadMesh(name, bytes) {
+  const mesh = await parseMesh(name, bytes)
+  return mesh.positions.length ? prepareMesh(mesh) : null
+}
+
+if (typeof module !== 'undefined') module.exports = { MESH_EXT, parseMesh, prepareMesh, loadMesh, parseStl, parseObj, parsePly, parse3mf }

@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const zlib = require('zlib')
-const { parseMesh } = require('../src/renderer/mesh')
+const { parseMesh, prepareMesh } = require('../src/renderer/mesh')
 
 const TRIANGLE = [0, 0, 0, 10, 0, 0, 0, 20, 5]
 const bytes = text => new TextEncoder().encode(text)
@@ -71,4 +71,16 @@ test('reads compressed 3MF and applies build transforms', async () => {
 </model>`
   const { positions } = await parseMesh('plate.3mf', zip('3D/3dmodel.model', model))
   close(positions, [100, 0, 0, 110, 0, 0, 100, 20, 5])
+})
+
+test('prepares Z-up models upright and centred, reporting the size as stored in the file', () => {
+  // One triangle 10 wide (x), 20 deep (y) and 30 tall (z)
+  const positions = new Float32Array([0, 0, 0, 10, 0, 0, 0, 20, 30])
+  const prepared = prepareMesh({ positions, zUp: true, units: 'mm' })
+  assert.deepEqual(prepared.size, [10, 20, 30])
+  assert.equal(prepared.triangles, 1)
+  assert.equal(prepared.ground, -15) // height (file z) becomes the viewer's y
+  const ys = [1, 4, 7].map(i => prepared.positions[i])
+  assert.equal(Math.min(...ys), -15)
+  assert.equal(Math.max(...ys), 15)
 })

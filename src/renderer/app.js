@@ -944,7 +944,7 @@ function renderedItems() {
     const nodes = $$('#main [data-path]').filter(isShown)
     const byPath = new Map()
     for (const node of nodes) byPath.set(node.dataset.path, [...(byPath.get(node.dataset.path) || []), node])
-    itemIndex = { byPath, paths: [...new Set(nodes.map(n => n.dataset.path))], content: nodes.filter(n => n.closest('#content')) }
+    itemIndex = { byPath, paths: [...new Set(nodes.map(n => n.dataset.path))], content: nodes.filter(n => n.parentElement.closest('#content')) }
   }
   return itemIndex
 }
@@ -1349,13 +1349,13 @@ async function openMeshPreview(container, file, isCurrent) {
     const bytes = await call('readBinary', file.path, MESH_VIEW_LIMIT)
     if (!isCurrent()) return
     if (!bytes) return void (status.textContent = t('mesh.tooLarge'))
-    const mesh = await parseMesh(file.name, bytes)
+    const prepared = await loadMeshInWorker(file.name, bytes)
     if (!isCurrent()) return
     // e.g. a compiler ".obj" object file: not a model, so show the generic file view instead
-    if (!mesh.positions.length) return container.replaceWith(otherView(file))
+    if (!prepared) return container.replaceWith(otherView(file))
     status.remove()
     disposeMeshView()
-    activeMeshView = createMeshView(container, mesh)
+    activeMeshView = createMeshView(container, prepared)
     const { triangles, size, units } = activeMeshView.prepared
     const dimensions = size.map(v => sizeFormat.format(v)).join(' × ') + (units ? ' ' + units : '')
     container.append(el('div', 'mesh-caption', t('mesh.stats', { triangles: integerFormat.format(triangles), size: dimensions })))
@@ -1388,7 +1388,7 @@ function showViewer() {
   viewerItemAbort?.abort()
   const box = $('#viewer')
   const file = viewer.items[viewer.index]
-  const isCurrent = () => viewer.items[viewer.index] === file
+  const isCurrent = () => viewerOpen() && viewer.items[viewer.index] === file
   let media
 
   if (file.type === 'video') {

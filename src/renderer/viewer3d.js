@@ -11,45 +11,30 @@ const FOV = 0.6
 // Distance at which the bounding sphere fits the view both horizontally and vertically.
 const fitDistance = (radius, aspect) => radius / Math.sin(Math.min(FOV / 2, Math.atan(Math.tan(FOV / 2) * aspect))) * 1.08
 
-/* ---------- geometry ---------- */
+/* ---------- loading ---------- */
 
-// Re-orients Z-up models to the viewer's Y-up, centres them and computes face normals.
-function prepareMesh(mesh) {
-  const src = mesh.positions
-  const positions = new Float32Array(src.length)
-  const min = [Infinity, Infinity, Infinity]
-  const max = [-Infinity, -Infinity, -Infinity]
-  const fileMin = [Infinity, Infinity, Infinity]
-  const fileMax = [-Infinity, -Infinity, -Infinity]
-  for (let i = 0; i < src.length; i += 3) {
-    const p = [src[i], src[i + 1], src[i + 2]]
-    for (let k = 0; k < 3; k++) { fileMin[k] = Math.min(fileMin[k], p[k]); fileMax[k] = Math.max(fileMax[k], p[k]) }
-    const q = mesh.zUp ? [p[0], p[2], -p[1]] : p
-    for (let k = 0; k < 3; k++) { positions[i + k] = q[k]; min[k] = Math.min(min[k], q[k]); max[k] = Math.max(max[k], q[k]) }
-  }
-  const center = min.map((v, k) => (v + max[k]) / 2)
-  for (let i = 0; i < positions.length; i += 3) for (let k = 0; k < 3; k++) positions[i + k] -= center[k]
+/*
+ * Parsing and preparing a model runs in a worker, so a large file never freezes the window.
+ * Resolves to the prepared mesh (see prepareMesh in mesh.js), or null when the file holds none.
+ */
+let meshWorker = null
+let meshJobs = 0
+const meshReplies = new Map()
 
-  const normals = new Float32Array(positions.length)
-  for (let i = 0; i < positions.length; i += 9) {
-    const ax = positions[i + 3] - positions[i], ay = positions[i + 4] - positions[i + 1], az = positions[i + 5] - positions[i + 2]
-    const bx = positions[i + 6] - positions[i], by = positions[i + 7] - positions[i + 1], bz = positions[i + 8] - positions[i + 2]
-    let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx
-    const length = Math.hypot(nx, ny, nz) || 1
-    nx /= length; ny /= length; nz /= length
-    for (let v = 0; v < 9; v += 3) { normals[i + v] = nx; normals[i + v + 1] = ny; normals[i + v + 2] = nz }
+function loadMeshInWorker(name, bytes) {
+  if (!meshWorker) {
+    meshWorker = new Worker('mesh-worker.js')
+    meshWorker.onmessage = ({ data }) => {
+      const reply = meshReplies.get(data.id)
+      meshReplies.delete(data.id)
+      data.error ? reply.reject(new Error(data.error)) : reply.resolve(data.mesh)
+    }
   }
-
-  const extent = max.map((v, k) => v - min[k])
-  return {
-    positions,
-    normals,
-    triangles: positions.length / 9,
-    radius: Math.max(Math.hypot(...extent) / 2, 1e-6),
-    ground: -extent[1] / 2,
-    size: fileMax.map((v, k) => v - fileMin[k]),
-    units: mesh.units,
-  }
+  const id = ++meshJobs
+  return new Promise((resolve, reject) => {
+    meshReplies.set(id, { resolve, reject })
+    meshWorker.postMessage({ id, name, bytes }, [bytes.buffer])
+  })
 }
 
 /* ---------- matrices (column-major) ---------- */
@@ -235,12 +220,11 @@ function createMeshRenderer(gl) {
 /* ---------- interactive view ---------- */
 
 // Drag to orbit, right drag or Shift+drag to pan, wheel to zoom, double click to reset.
-function createMeshView(container, mesh) {
+function createMeshView(container, prepared) {
   const canvas = el('canvas', 'mesh-canvas')
   container.append(canvas)
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true })
   if (!gl) throw new Error('WebGL 2 is not available')
-  const prepared = prepareMesh(mesh)
   const renderer = createMeshRenderer(gl)
   renderer.load(prepared)
 
@@ -317,9 +301,8 @@ function meshThumbnail(path) {
   const job = thumbQueue.then(async () => {
     const bytes = await call('readBinary', path, MESH_THUMB_LIMIT)
     if (!bytes) return null
-    const mesh = await parseMesh(baseName(path), bytes)
-    if (!mesh.positions.length) return null
-    const prepared = prepareMesh(mesh)
+    const prepared = await loadMeshInWorker(baseName(path), bytes)
+    if (!prepared) return null
     if (!thumbRenderer) {
       thumbCanvas = Object.assign(document.createElement('canvas'), { width: THUMB_SIZE[0], height: THUMB_SIZE[1] })
       thumbRenderer = createMeshRenderer(thumbCanvas.getContext('webgl2', { antialias: true, alpha: true, preserveDrawingBuffer: true }))
