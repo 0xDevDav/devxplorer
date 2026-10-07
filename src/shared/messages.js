@@ -193,6 +193,7 @@ const MESSAGES = {
     'key.wheel': 'Wheel',
     'key.drag': 'Drag',
     'keys.reorder': 'Reorder files in the folder, numbering them',
+    'keys.dragCopy': 'Copy instead of moving',
 
     'path.notFound': 'Folder not found: {path}',
     'palette.placeholder': 'Go to folder…',
@@ -460,6 +461,7 @@ const MESSAGES = {
     'key.wheel': 'Rotella',
     'key.drag': 'Trascina',
     'keys.reorder': 'Riordina i file nella cartella numerandoli',
+    'keys.dragCopy': 'Copia invece di spostare',
 
     'path.notFound': 'Cartella non trovata: {path}',
     'palette.placeholder': 'Vai alla cartella…',

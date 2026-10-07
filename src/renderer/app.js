@@ -433,6 +433,7 @@ const SHORTCUTS = [
     ['Ctrl+D', 'menu.duplicate'],
     ['Ctrl+Shift+C', 'menu.copyPath'],
     ['Ctrl+I', 'menu.info'],
+    ['Ctrl+key.drag', 'keys.dragCopy'],
     ['Alt+key.drag', 'keys.reorder'],
     ['Ctrl+Z', 'keys.undo'],
     ['Ctrl+A', 'keys.selectAll'],
@@ -698,7 +699,7 @@ function folderRow(entry) {
   fillFolderPreview(entry, collage, count, entry.self)
 
   row.addEventListener('click', e => { if (!e.ctrlKey && !e.shiftKey) focusEntry(entry) })
-  dropTarget(row, entry.path)
+  dropTarget(row, entry.path, () => focusEntry(entry))
   if (!entry.self) {
     selectable(row, entry.path, true)
     row.addEventListener('dblclick', () => navigate(entry.path))
@@ -907,7 +908,7 @@ function folderListRow(folder) {
   row.title = folder.path
   selectable(row, folder.path, true)
   row.addEventListener('dblclick', () => navigate(folder.path))
-  dropTarget(row, folder.path)
+  dropTarget(row, folder.path, () => navigate(folder.path))
   return row
 }
 
@@ -973,7 +974,7 @@ function folderTile(folder) {
   fillFolderPreview(folder, collage, count)
   selectable(tile, folder.path, true)
   tile.addEventListener('dblclick', () => navigate(folder.path))
-  dropTarget(tile, folder.path)
+  dropTarget(tile, folder.path, () => navigate(folder.path))
   return tile
 }
 
@@ -1069,7 +1070,7 @@ function fileCard(file, siblings) {
     const paths = droppedPaths(e)
     const dir = parentDir(file.path)
     if (!paths.length) return
-    if (!paths.every(p => samePath(parentDir(p), dir))) await moveItems(paths, dir)
+    if (!paths.every(p => samePath(parentDir(p), dir))) await (e.ctrlKey ? copyItems : moveItems)(paths, dir)
     else if (e.altKey) await reorder(dir, paths, file.path, insertAfter)
     else return
     refresh()
@@ -1205,15 +1206,36 @@ async function renderDiskSpace() {
 
 const droppedPaths = e => [...e.dataTransfer.files].map(f => api.pathFor(f)).filter(Boolean)
 
-function dropTarget(node, dir) {
-  node.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); node.classList.add('target') })
-  node.addEventListener('dragleave', () => node.classList.remove('target'))
+/*
+ * Dropping files on node moves them into dir; holding Ctrl copies them, as in File Explorer. With
+ * open, holding the files over the target for a moment opens it, like the Finder's spring-loaded
+ * folders, so a drop can reach a folder several levels down.
+ */
+const SPRING_MS = 800
+function dropTarget(node, dir, open = null) {
+  let timer = null
+  const cancel = () => { clearTimeout(timer); timer = null }
+  node.addEventListener('dragover', e => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = e.ctrlKey ? 'copy' : 'move'
+    node.classList.add('target')
+    if (open && !timer) timer = setTimeout(() => { node.classList.remove('target'); open() }, SPRING_MS)
+  })
+  node.addEventListener('dragleave', e => {
+    if (node.contains(e.relatedTarget)) return
+    node.classList.remove('target')
+    cancel()
+  })
   node.addEventListener('drop', async e => {
     e.preventDefault()
     e.stopPropagation()
+    cancel()
     node.classList.remove('target')
     const paths = droppedPaths(e)
-    if (paths.length) { await moveItems(paths, dir); refresh() }
+    if (!paths.length) return
+    await (e.ctrlKey ? copyItems : moveItems)(paths, dir)
+    refresh()
   })
 }
 
@@ -1885,7 +1907,7 @@ function placeButton(dir, name, kind) {
     { label: t('menu.copyPath'), run: () => copyPaths([dir]) },
     { label: isPinned(dir) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(dir) },
   ])
-  dropTarget(b, dir)
+  dropTarget(b, dir, () => navigate(dir))
   return b
 }
 
@@ -1928,7 +1950,7 @@ function renderTabs() {
     node.title = tab.cwd
     node.onclick = () => switchTab(i)
     node.onauxclick = e => { if (e.button === 1) closeTab(i) }
-    dropTarget(node, tab.cwd)
+    dropTarget(node, tab.cwd, () => switchTab(i))
     return node
   }))
   const add = el('button', 'new-tab')
@@ -1949,7 +1971,7 @@ function renderCrumbs() {
     const target = path
     const b = el('button', '', name)
     b.onclick = () => navigate(target)
-    dropTarget(b, target)
+    dropTarget(b, target, () => navigate(target))
     crumbs.append(b)
     if (i < parts.length - 1) crumbs.append(icon('chevron', 'sep'))
   })
@@ -2328,7 +2350,7 @@ function bindEvents() {
     e.preventDefault()
     const paths = droppedPaths(e)
     const dir = contentPane.dataset.path
-    if (paths.length && dir) { await moveItems(paths, dir); refresh() }
+    if (paths.length && dir) { await (e.ctrlKey ? copyItems : moveItems)(paths, dir); refresh() }
   })
 
   // Without this, dropping a file outside a target would navigate the window to it.
