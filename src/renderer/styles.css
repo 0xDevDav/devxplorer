@@ -192,6 +192,9 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 #crumbs button { max-width: 220px; overflow: hidden; text-overflow: ellipsis }
 #crumbs button:last-of-type { flex: 0 1 auto; min-width: 48px }
 #crumbs .crumb-more { flex: none; letter-spacing: 1px }
+#crumbs { cursor: text }
+#crumbs button { cursor: pointer }
+.path-input { flex: 1; min-width: 0; padding: 5px 10px; background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 0 0 3px var(--accent-soft); outline: none; user-select: text }
 #crumbs button { padding: 4px 8px; background: none; border: 0; border-radius: 6px; color: var(--muted); white-space: nowrap; cursor: pointer }
 #crumbs button:last-of-type { color: var(--text); font-weight: 600 }
 #crumbs button:hover { background: var(--panel2); color: var(--text) }
@@ -425,7 +428,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 }
 #menu:not([hidden]) { animation: pop-in var(--fast) var(--ease) }
 #menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px; background: none; border: 0; border-radius: 5px; text-align: left; cursor: default; transition: none }
-#menu button:hover { background: var(--accent); color: var(--on-accent) }
+#menu button:hover, #menu button.active { background: var(--accent); color: var(--on-accent) }
 #menu button:hover kbd { color: var(--on-accent); opacity: .75 }
 #menu button.danger:hover { background: var(--danger); color: #fff }
 #menu span { flex: 1 }
@@ -640,5 +643,5 @@ dialog .actions button:hover { border-color: var(--muted) }
   .popup > span:not(.icon) { display: none }
   .popup > .icon:last-child { display: none }
   .popup .lead { display: inline-flex }
-  .popup { padding: 5px 7px 5px 9px }
+  .popup { justify-content: center; width: 32px; height: 30px; padding: 0 }
 }

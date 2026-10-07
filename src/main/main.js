@@ -126,6 +126,16 @@ const handlers = {
 
   items: async paths => (await Promise.all(paths.map(describe))).filter(Boolean),
 
+  // Typed path -> existing folder, expanding %VARIABLES% and surrounding quotes; null otherwise.
+  async resolveFolder(text) {
+    const expanded = text.trim().replace(/^"(.*)"$/, '$1').replace(/%([^%]+)%/g, (m, name) => process.env[name] ?? m)
+    if (!path.isAbsolute(expanded)) return null
+    const folder = path.normalize(expanded)
+    const stat = await fsp.stat(folder).catch(() => null)
+    if (!stat?.isDirectory()) return null
+    return folder.length > 3 ? folder.replace(/\\+$/, '') : folder
+  },
+
   // Recursive size of a folder, cached for a minute because large trees take a while to walk.
   folderSize(dir) {
     const key = lower(dir)

@@ -1347,6 +1347,7 @@ function renderTabs() {
 
 function renderCrumbs() {
   const crumbs = $('#crumbs')
+  if (crumbs.querySelector('.path-input')) return // the user is typing a path
   crumbs.replaceChildren()
   const parts = state.cwd.split('\\').filter(Boolean)
   let path = ''
@@ -1366,6 +1367,76 @@ function renderCrumbs() {
  * When the path does not fit, intermediate folders collapse into a "…" button listing them,
  * like the macOS path bar: the drive and the last folders stay visible.
  */
+/*
+ * Editable path: clicking the empty part of the breadcrumb bar or pressing Ctrl+L turns it into a
+ * text field. Matching subfolders are suggested below; ↑↓ choose, Tab completes, Enter opens.
+ */
+const PATH_SUGGESTIONS = 8
+
+function editPath() {
+  const crumbs = $('#crumbs')
+  if (crumbs.querySelector('.path-input')) return
+  const input = el('input', 'path-input')
+  input.value = state.cwd
+  input.spellcheck = false
+  crumbs.replaceChildren(input)
+  input.focus()
+  input.select()
+
+  let suggestions = []
+  let index = -1
+  const close = () => {
+    $('#menu').hidden = true
+    crumbs.replaceChildren()
+    renderCrumbs()
+  }
+  const paint = () => $$('#menu button').forEach((b, i) => b.classList.toggle('active', i === index))
+  // A typed path that is not a folder falls back to the first suggestion, so "…\Pro" + Enter works.
+  const open = async target => {
+    const folder = (await call('resolveFolder', target)) || (index < 0 && suggestions[0]?.path)
+    if (!folder) return toast(t('path.notFound', { path: target }))
+    close()
+    navigate(folder)
+  }
+  const suggest = async () => {
+    const text = input.value
+    const cut = text.lastIndexOf('\\')
+    suggestions = []
+    index = -1
+    if (cut >= 0) {
+      const prefix = text.slice(cut + 1).toLowerCase()
+      const parent = await call('resolveFolder', text.slice(0, cut + 1))
+      const data = parent && await call('list', parent)
+      if (input.value !== text) return
+      suggestions = (data?.folders || []).filter(f => f.name.toLowerCase().startsWith(prefix)).sort(byName).slice(0, PATH_SUGGESTIONS)
+    }
+    if (!suggestions.length) { $('#menu').hidden = true; return }
+    const r = input.getBoundingClientRect()
+    showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 4 }, suggestions.map(f => ({ label: f.name, run: () => open(f.path) })))
+  }
+
+  input.addEventListener('input', suggest)
+  input.addEventListener('keydown', e => {
+    const step = { ArrowDown: 1, ArrowUp: -1 }[e.key]
+    if (step && suggestions.length) {
+      e.preventDefault()
+      index = (index + step + suggestions.length) % suggestions.length
+      paint()
+    } else if (e.key === 'Tab' && suggestions.length) {
+      e.preventDefault()
+      input.value = joinPath((suggestions[index] || suggestions[0]).path, '')
+      suggest()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      open(index >= 0 ? suggestions[index].path : input.value.trim())
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      close()
+    }
+  })
+  input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== input) close() }, 120))
+}
+
 function fitCrumbs() {
   const crumbs = $('#crumbs')
   crumbs.querySelector('.crumb-more')?.nextElementSibling?.remove()
@@ -1413,7 +1484,7 @@ function showTab() {
   return refresh()
 }
 
-/* ========== quick navigation: "Go to" palette (Ctrl+K / Ctrl+L) and type-to-select ========== */
+/* ========== quick navigation: "Go to" palette (Ctrl+K) and type-to-select ========== */
 
 const RECENT_LIMIT = 30
 const PALETTE_LIMIT = 12
@@ -1492,9 +1563,9 @@ function paintPalette() {
   $$('#paletteList .palette-row')[paletteIndex]?.scrollIntoView({ block: 'nearest' })
 }
 
-function openPalette(prefill = '') {
+function openPalette() {
   const dialog = $('#palette')
-  $('#paletteInput').value = prefill
+  $('#paletteInput').value = ''
   paletteIndex = 0
   renderPalette()
   dialog.showModal()
@@ -1622,6 +1693,9 @@ function bindEvents() {
   document.addEventListener('drop', e => e.preventDefault())
 
   document.addEventListener('mousedown', e => { if (!$('#menu').contains(e.target)) $('#menu').hidden = true })
+  // clicking a menu item must not take focus away, e.g. from the path field it completes
+  $('#menu').addEventListener('mousedown', e => e.preventDefault())
+  $('#crumbs').addEventListener('click', e => { if (e.target.id === 'crumbs') editPath() })
 
   document.addEventListener('keydown', e => {
     if ($('dialog[open]')) return
@@ -1646,7 +1720,7 @@ function bindEvents() {
     }
 
     if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette() }
-    if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); return openPalette(state.cwd) }
+    if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); return editPath() }
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
     if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); return closeTab(tabIndex) }
     if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); return switchTab(tabIndex + (e.shiftKey ? -1 : 1)) }

@@ -104,6 +104,7 @@ const MESSAGES = {
     'menu.duplicate': 'Duplicate',
     'key.delete': 'Del',
 
+    'path.notFound': 'Folder not found: {path}',
     'palette.placeholder': 'Go to folder…',
     'palette.hint': '↑↓ choose · Enter open · Ctrl+Enter new tab · Esc close',
     'palette.none': 'No folder found',
@@ -260,6 +261,7 @@ const MESSAGES = {
     'menu.duplicate': 'Duplica',
     'key.delete': 'Canc',
 
+    'path.notFound': 'Cartella non trovata: {path}',
     'palette.placeholder': 'Vai alla cartella…',
     'palette.hint': '↑↓ scegli · Invio apri · Ctrl+Invio nuova scheda · Esc chiudi',
     'palette.none': 'Nessuna cartella trovata',
