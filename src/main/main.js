@@ -11,11 +11,17 @@ const recycle = require('./recycle')
 const shellIntegration = require('./shell-integration')
 const { powershell, zip, unzip } = require('./powershell')
 const { validName, uniquePath } = require('./paths')
+const log = require('./log')
 const fileOps = require('./fileops')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
 const WINDOW_FILE = path.join(DATA_DIR, 'window.json')
+
+// Unexpected errors are written to the log instead of stopping the app with an error box.
+log.init(path.join(DATA_DIR, 'logs'))
+process.on('uncaughtException', error => log.error('main:', error))
+process.on('unhandledRejection', reason => log.error('main, unhandled rejection:', reason))
 const BG = '#0d0d10'
 const SYMBOLS = '#c9c9d4'
 
@@ -367,6 +373,15 @@ const handlers = {
 
   copyText: text => clipboard.writeText(text),
 
+  // Errors of the page end up in the same log as the main process ones.
+  logError: message => log.error('renderer:', String(message).slice(0, 4000)),
+
+  // Shows the log file in File Explorer, for attaching it to a bug report.
+  async showLog() {
+    if (!fs.existsSync(log.file())) fs.writeFileSync(log.file(), '')
+    shell.showItemInFolder(log.file())
+  },
+
   shellIntegration: () => shellIntegration.isEnabled(),
 
   async setShellIntegration(enabled) {
@@ -511,6 +526,9 @@ ipcMain.on('drag', (e, paths, icon) => {
   e.sender.startDrag({ file: paths[0], files: paths, icon: img })
 })
 
+const CRASH_LIMIT = 3
+const CRASH_WINDOW_MS = 60000
+
 /*
  * Opens a window on startFolder (null: the first window, which restores the saved tabs). A window
  * opened from another one cascades from its position.
@@ -553,6 +571,17 @@ function createWindow(startFolder = null, from = null) {
     win.watcher?.close()
     writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome, appearance })
   })
+  // A page that crashes is reloaded; if it keeps crashing the user is told instead of looping.
+  const crashes = []
+  win.webContents.on('render-process-gone', (e, details) => {
+    log.error('renderer gone:', details.reason, 'exit code', details.exitCode)
+    if (details.reason === 'clean-exit' || win.isDestroyed()) return
+    const now = Date.now()
+    crashes.push(now)
+    if (crashes.filter(at => now - at < CRASH_WINDOW_MS).length < CRASH_LIMIT) return win.reload()
+    dialog.showMessageBox(win, { type: 'error', message: t('crash.title'), detail: t('crash.detail', { file: log.file() }) })
+  })
+  win.on('unresponsive', () => log.error('window not responding'))
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
   return win
 }

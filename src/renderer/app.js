@@ -2522,6 +2522,7 @@ function bindEvents() {
     applyTheme()
   }
   $('#exportBtn').onclick = exportLibrary
+  $('#logBtn').onclick = () => call('showLog')
   $('#importBtn').onclick = importLibrary
   $('.search').prepend(icon('search'))
   $('#q').addEventListener('keydown', e => {
@@ -2671,6 +2672,11 @@ function bindTooltips() {
 }
 
 /* ========== startup ========== */
+
+// Errors in the page go to the app's log file; reporting must never raise another error.
+const reportError = message => api.call('logError', message).catch(() => {})
+window.addEventListener('error', e => reportError(e.error?.stack || `${e.message} (${e.filename}:${e.lineno})`))
+window.addEventListener('unhandledrejection', e => reportError(e.reason?.stack || String(e.reason)))
 
 // Runs after every extension script has registered itself.
 document.addEventListener('DOMContentLoaded', async () => {
