@@ -84,6 +84,11 @@ const MESSAGES = {
     'folder.newDefault': 'New folder',
     'filter.results': '{items} matching this filter across the PC',
     'filter.none': 'No results',
+    'search.here': '“{folder}”',
+    'search.deep': 'Including subfolders',
+    'search.searching': 'Searching…',
+    'search.results': '{items} in “{folder}” and its subfolders',
+    'search.truncated': 'First {items} in “{folder}” and its subfolders: refine the search to see the rest',
 
     'day.today': 'Today',
     'day.yesterday': 'Yesterday',
@@ -324,6 +329,11 @@ const MESSAGES = {
     'folder.newDefault': 'Nuova cartella',
     'filter.results': '{items} con questo filtro, in tutto il PC',
     'filter.none': 'Nessun risultato',
+    'search.here': '«{folder}»',
+    'search.deep': 'Anche nelle sottocartelle',
+    'search.searching': 'Ricerca in corso…',
+    'search.results': '{items} in «{folder}» e nelle sottocartelle',
+    'search.truncated': 'Primi {items} in «{folder}» e nelle sottocartelle: affina la ricerca per vedere gli altri',
 
     'day.today': 'Oggi',
     'day.yesterday': 'Ieri',

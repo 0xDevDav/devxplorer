@@ -303,6 +303,7 @@ button:disabled { opacity: .5; cursor: default }
 #main { grid-area: main; display: flex; min-width: 0; min-height: 0 }
 #content { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 60px }
 #content > .hint { margin: 0 4px 12px }
+.search-scope { display: flex; width: fit-content; margin: 0 0 16px }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 90px; text-align: center; color: var(--muted) }
 .empty .icon { width: 44px; height: 44px; margin-bottom: 6px; color: var(--faint) }
 .empty-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-soft) }

@@ -137,6 +137,37 @@ async function connectedDrives() {
   return (await Promise.all([...'CDEFGHIJKLMNOPQRSTUVWXYZ'].map(c => probe(c + ':\\')))).filter(Boolean)
 }
 
+/*
+ * Search by name in a folder and everything below it, level by level so nearer matches come first.
+ * A newer search cancels the one running; results stop at SEARCH_LIMIT.
+ */
+const SEARCH_LIMIT = 500
+let searchGeneration = 0
+
+async function searchTree(dir, query, showHidden) {
+  const generation = ++searchGeneration
+  const needle = query.toLowerCase()
+  const found = []
+  let level = [dir]
+  while (level.length && found.length < SEARCH_LIMIT) {
+    if (generation !== searchGeneration) return null
+    const next = []
+    await Promise.all(level.map(async d => {
+      const entries = await throttled(() => fsp.readdir(d, { withFileTypes: true })).catch(() => [])
+      for (const entry of entries) {
+        if (STRAY_NUL.test(entry.name) || (!showHidden && HIDDEN.test(entry.name))) continue
+        const p = path.join(d, entry.name)
+        if (entry.name.toLowerCase().includes(needle)) found.push(p)
+        if (entry.isDirectory() && !entry.isSymbolicLink()) next.push(p)
+      }
+    }))
+    level = next
+  }
+  if (generation !== searchGeneration) return null
+  const items = (await Promise.all(found.slice(0, SEARCH_LIMIT).map(describe))).filter(Boolean)
+  return { items, truncated: found.length >= SEARCH_LIMIT }
+}
+
 const handlers = {
   init: async () => ({
     supportsGlass: SUPPORTS_MICA,
@@ -190,6 +221,9 @@ const handlers = {
   },
 
   items: async paths => (await Promise.all(paths.map(describe))).filter(Boolean),
+
+  // { items, truncated }, or null when a newer search replaced this one.
+  search: (dir, query, showHidden) => searchTree(dir, query, showHidden),
 
   // Typed path -> existing folder, expanding %VARIABLES% and surrounding quotes; null otherwise.
   async resolveFolder(text) {

@@ -124,6 +124,7 @@ const state = {
   sort: localStorage.sort || 'name',
   reverse: localStorage.reverse === 'true',
   showHidden: localStorage.showHidden === 'true',
+  searchDeep: localStorage.searchDeep === 'true', // search also in subfolders
   group: localStorage.group || 'none',
   query: '',
 }
@@ -622,6 +623,22 @@ async function render() {
       el('p', 'hint', t('filter.results', { items: t.n('count.items', count) })),
       count ? grid(folders, files, null) : emptyState('search', t('filter.none')),
     ])
+  } else if (state.query && state.searchDeep) {
+    $('#folders').hidden = true
+    showContent(null, [searchScope(), emptyState('search', t('search.searching'))])
+    const result = await call('search', state.cwd, state.query, state.showHidden)
+    if (id !== renderId || !result) return
+    const items = remember(result.items)
+    if (needsPhotoDates()) await attachPhotoDates(items.filter(i => !i.isDir))
+    if (id !== renderId) return
+    const folders = sorted(items.filter(i => i.isDir))
+    const files = sorted(items.filter(i => !i.isDir))
+    const params = { items: t.n('count.items', items.length), folder: baseName(state.cwd) }
+    showContent(null, [
+      searchScope(),
+      el('p', 'hint', t(result.truncated ? 'search.truncated' : 'search.results', params)),
+      items.length ? grid(folders, files, null) : emptyState('search', t('filter.none')),
+    ])
   } else {
     const data = await list(state.cwd)
     if (id !== renderId) return
@@ -695,12 +712,24 @@ async function renderPane(entry, data) {
   }
 
   showContent(entry.path, [
+    ...(state.query ? [searchScope()] : []),
     head,
     folders.length || files.length ? grid(folders, files, entry.path)
       : data.denied ? emptyState('lock', t('folder.denied'), t('folder.deniedHint'))
       : emptyState('folderFill', t('folder.empty')),
   ])
   paintSelection()
+}
+
+// While searching, chooses between this folder only and this folder with all its subfolders.
+function searchScope() {
+  const bar = el('div', 'segmented search-scope')
+  for (const [deep, label] of [[false, t('search.here', { folder: baseName(state.cwd) })], [true, t('search.deep')]]) {
+    const b = el('button', state.searchDeep === deep ? 'on' : '', label)
+    b.onclick = () => { state.searchDeep = deep; localStorage.searchDeep = deep; render() }
+    bar.append(b)
+  }
+  return bar
 }
 
 // A centred icon with a title and an optional explanation, for folders with nothing to show.
