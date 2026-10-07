@@ -146,3 +146,31 @@ async function showPdf(container, lib, doc, signal) {
 }
 
 let activePdf = null
+
+// First page as an image for the file grid. Thumbnails render one at a time, like the 3D ones.
+const PDF_THUMB_LIMIT = 50 * 1024 * 1024
+const PDF_THUMB_WIDTH = 360
+let pdfThumbQueue = Promise.resolve()
+
+function pdfThumbnail(path) {
+  const job = pdfThumbQueue.then(async () => {
+    const lib = await loadPdfjs()
+    const bytes = await call('readBinary', path, PDF_THUMB_LIMIT)
+    if (!bytes) return null
+    const task = lib.getDocument({ data: bytes, cMapUrl: PDFJS_DIR + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS_DIR + 'standard_fonts/', wasmUrl: PDFJS_DIR + 'wasm/', isEvalSupported: false })
+    try {
+      const page = await (await task.promise).getPage(1)
+      const viewport = page.getViewport({ scale: PDF_THUMB_WIDTH / page.getViewport({ scale: 1 }).width })
+      const canvas = Object.assign(document.createElement('canvas'), { width: Math.floor(viewport.width), height: Math.floor(viewport.height) })
+      const context = canvas.getContext('2d')
+      context.fillStyle = '#fff'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      await page.render({ canvas, viewport }).promise
+      return canvas.toDataURL('image/jpeg', 0.85)
+    } finally {
+      task.destroy()
+    }
+  }).catch(() => null)
+  pdfThumbQueue = job
+  return job
+}

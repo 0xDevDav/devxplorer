@@ -511,6 +511,7 @@ async function loadPreview(path, type) {
   if (docKind(baseName(path)) === 'app') return { icon: await call('appIcon', path) }
   if (state.items.get(path)?.cloud) return {} // reading it would download it
   if (MESH_EXT.test(path)) return { img: await meshThumbnail(path) }
+  if (/\.pdf$/i.test(path)) return { img: await pdfThumbnail(path) }
   const text = await call('readText', path)
   return text != null ? { text } : {}
 }
