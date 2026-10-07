@@ -208,7 +208,7 @@ async function importLibrary() {
 // Generic files: text excerpt first, then the shell thumbnail, then the associated program icon.
 async function loadPreview(path, type) {
   if (type !== 'file') return { img: await call('thumb', path) }
-  const text = await call('peek', path)
+  const text = await call('readText', path)
   if (text != null) return { text }
   const img = await call('thumb', path)
   return img ? { img } : { icon: await call('icon', path) }
@@ -259,24 +259,22 @@ async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
 
 /*
  * Entering a folder plays a cascade: the folder list fades in, its rows slide in one after
- * another, then the content pane follows. cascadeBase delays the whole sequence, e.g. until the
- * hover preview has grown into the content area. Refreshing the same folder does not replay it.
+ * another, then the content pane follows. Refreshing the same folder does not replay it.
  */
 const EASE = 'cubic-bezier(.2, .8, .2, 1)'
 const CASCADE_STEP_MS = 30
 const CASCADE_MAX_STEPS = 12
 const CASCADE_ROW_MS = 320
-let cascadeBase = 0
 let contentDelay = 0
 
 function playCascade(pane, rows) {
   if (reducedMotion.matches) return
-  pane.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: cascadeBase, easing: 'ease-out', fill: 'backwards' })
+  pane.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out', fill: 'backwards' })
   rows.forEach((row, i) => row.animate(
     [{ opacity: 0, transform: 'translateX(-12px)' }, { opacity: 1, transform: 'none' }],
-    { duration: CASCADE_ROW_MS, delay: cascadeBase + Math.min(i, CASCADE_MAX_STEPS) * CASCADE_STEP_MS, easing: EASE, fill: 'backwards' },
+    { duration: CASCADE_ROW_MS, delay: Math.min(i, CASCADE_MAX_STEPS) * CASCADE_STEP_MS, easing: EASE, fill: 'backwards' },
   ))
-  contentDelay = cascadeBase + Math.min(rows.length, 4) * CASCADE_STEP_MS
+  contentDelay = Math.min(rows.length, 4) * CASCADE_STEP_MS
 }
 
 let renderId = 0
@@ -306,7 +304,6 @@ async function render() {
     pane.dataset.cwd = state.cwd
     if (!folders.length) {
       pane.hidden = true
-      if (entering) contentDelay = cascadeBase
       await renderPane({ ...here, name: baseName(state.cwd) }, data)
     } else {
       const entries = data.files.length ? [here, ...folders] : folders
@@ -705,7 +702,7 @@ function showViewer() {
     media = Object.assign(el('iframe', 'doc'), { src: fileUrl(file.path) })
   } else {
     media = el('div', 'other')
-    call('peek', file.path, 500000).then(async text => {
+    call('readText', file.path, 500000).then(async text => {
       if (!isCurrent()) return
       if (text != null) return media.replaceWith(el('pre', 'textview', text))
       const icon = Object.assign(el('img'), { src: (await call('icon', file.path)) || '' })
@@ -776,104 +773,8 @@ async function treeNode(dir, name, depth) {
     { label: 'Apri in Esplora file', run: () => call('open', dir) },
     { label: isPinned(dir) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(dir) },
   ])
-  hoverPreview(row, dir, name)
   dropTarget(row, dir)
   return node
-}
-
-/*
- * Resting the pointer on a sidebar folder previews it over the content area, at nearly the size it
- * would have once opened, on a dimmed backdrop. Moving the pointer onto the preview opens that folder.
- * The folder already open is not previewed.
- *
- * The preview only appears once the pointer stays still on a row (any movement restarts the wait),
- * so scanning the sidebar never triggers it. With a preview up, switching rows waits a shorter
- * time; the grace period on leave keeps it up while the pointer travels to it.
- */
-const PEEK_REST_MS = 700
-const PEEK_SWITCH_MS = 250
-const PEEK_GRACE_MS = 300
-const PEEK_MARGIN = 24
-const PEEK_MAX_ITEMS = 60
-let peekToken = 0
-let peekHideTimer = null
-const peekOpen = () => $('#peek').classList.contains('show')
-
-function hoverPreview(row, dir, name) {
-  let timer
-  const wait = () => {
-    clearTimeout(timer)
-    timer = setTimeout(() => showPeek(dir, name), peekOpen() ? PEEK_SWITCH_MS : PEEK_REST_MS)
-  }
-  row.addEventListener('mouseenter', () => {
-    clearTimeout(peekHideTimer)
-    if (samePath(dir, state.cwd)) return hidePeek()
-    wait()
-  })
-  row.addEventListener('mousemove', () => {
-    const alreadyShown = peekOpen() && samePath(dir, $('#peek').dataset.dir)
-    if (!samePath(dir, state.cwd) && !alreadyShown) wait()
-  })
-  row.addEventListener('mouseleave', () => {
-    clearTimeout(timer)
-    peekHideTimer = setTimeout(hidePeek, PEEK_GRACE_MS)
-  })
-  row.addEventListener('mousedown', hidePeek)
-}
-
-async function showPeek(dir, name) {
-  const token = ++peekToken
-  const data = await list(dir)
-  if (token !== peekToken) return
-
-  const folders = sorted(data.folders)
-  const files = sorted(data.files)
-  const shown = Math.min(folders.length + files.length, PEEK_MAX_ITEMS)
-  const head = el('div', 'peek-head')
-  head.append(el('h2', '', name), el('span', 'fcount', countLabel(data)))
-  const body = shown
-    ? grid(folders.slice(0, shown), files.slice(0, Math.max(0, shown - folders.length)), null)
-    : el('p', 'empty', 'Cartella vuota')
-
-  const peek = $('#peek')
-  peek.classList.remove('expanding')
-  peek.dataset.dir = dir
-  peek.replaceChildren(head, body)
-  const area = $('#main').getBoundingClientRect()
-  Object.assign(peek.style, {
-    left: area.left + PEEK_MARGIN + 'px',
-    top: area.top + PEEK_MARGIN + 'px',
-    width: area.width - PEEK_MARGIN * 2 + 'px',
-    height: area.height - PEEK_MARGIN * 2 + 'px',
-  })
-  peek.classList.add('show')
-  $('#dim').classList.add('show')
-}
-
-// The preview grows to fill the content area while the folder opens underneath, then fades out.
-const PEEK_EXPAND_MS = 280
-
-async function openPeekedFolder() {
-  if (!peekOpen()) return
-  const peek = $('#peek')
-  clearTimeout(peekHideTimer)
-  peekToken++
-  const area = $('#main').getBoundingClientRect()
-  peek.classList.add('expanding')
-  Object.assign(peek.style, { left: area.left + 'px', top: area.top + 'px', width: area.width + 'px', height: area.height + 'px' })
-  $('#dim').classList.remove('show')
-  cascadeBase = PEEK_EXPAND_MS
-  await Promise.all([navigate(peek.dataset.dir), new Promise(r => setTimeout(r, PEEK_EXPAND_MS))])
-  cascadeBase = 0
-  peek.classList.remove('show')
-  setTimeout(() => { if (!peekOpen()) peek.classList.remove('expanding') }, FADE_MS)
-}
-
-function hidePeek() {
-  clearTimeout(peekHideTimer)
-  peekToken++
-  $('#peek').classList.remove('show')
-  $('#dim').classList.remove('show')
 }
 
 function renderExtensionSidebar() {
@@ -1029,7 +930,6 @@ function bindEvents() {
     if (e.key === 'Enter') { e.preventDefault(); $('#ask').close('ok') }
   })
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
-  $('#peek').addEventListener('mouseenter', openPeekedFolder)
   $('#settingsBtn').onclick = openSettings
   $('#exportBtn').onclick = exportLibrary
   $('#importBtn').onclick = importLibrary

@@ -37,7 +37,6 @@
   --surface: #1c1c23f0;
   --shadow: 0 12px 40px #0008;
   --backdrop: #0009;
-  --dim: #000000a6;
   --placeholder: #3a3a46;
   --switch-off: #33333d;
   --toast-bg: #2a1c1f;
@@ -66,7 +65,6 @@
   --surface: #fffffff2;
   --shadow: 0 12px 40px #1b1b2224;
   --backdrop: #1b1b2266;
-  --dim: #12121a59;
   --placeholder: #d3d3dc;
   --switch-off: #d0d0d9;
   --toast-bg: #fff1f1;
@@ -175,8 +173,7 @@ button, .row, .frow, .item, .chip, .tab, #toolbar, #side, #folders, .sec {
 
 /* ---------- sidebar ---------- */
 
-/* Stays above the hover backdrop, so the pointer can move between folders while it is shown. */
-#side { grid-area: side; position: relative; z-index: 16; display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; overflow: auto; background: var(--bg); border-right: 1px solid var(--line) }
+#side { grid-area: side; display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; overflow: auto; background: var(--bg); border-right: 1px solid var(--line) }
 #side h4 { margin: 18px 8px 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
 #side h4:first-child { margin-top: 6px }
 #extside { display: contents }
@@ -288,53 +285,6 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 .ins-before { box-shadow: inset 3px 0 var(--accent) }
 .ins-after { box-shadow: inset -3px 0 var(--accent) }
 .target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-faint) }
-
-/* ---------- folder hover preview ---------- */
-
-#dim {
-  position: fixed;
-  inset: 0;
-  z-index: 14;
-  background: var(--dim);
-  backdrop-filter: blur(2px);
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--normal) var(--ease), visibility 0s var(--normal);
-}
-#dim.show { opacity: 1; visibility: visible; transition-delay: 0s }
-
-/* Preview laid over the content area; entering it with the pointer opens the folder. */
-#peek {
-  position: fixed;
-  z-index: 17;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 20px 22px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transform: scale(.96);
-  transition: opacity var(--normal) var(--ease), transform .26s var(--ease), visibility 0s var(--normal);
-}
-#peek.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; pointer-events: auto; cursor: pointer }
-/* opening the previewed folder: grow to the content area, then fade out over the opened view */
-#peek.expanding { transform: none; border-color: transparent; border-radius: 0; box-shadow: none }
-#peek.expanding.show {
-  transition: left .28s var(--ease), top .28s var(--ease), width .28s var(--ease), height .28s var(--ease),
-    border-radius .28s var(--ease), border-color .28s, box-shadow .28s;
-}
-#peek.expanding:not(.show) { transition: opacity var(--normal) ease, visibility 0s var(--normal) }
-/* fade out the last row instead of cutting it */
-#peek::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(transparent, var(--bg)) }
-.peek-head { display: flex; align-items: baseline; gap: 12px; margin: 0 4px 14px }
-.peek-head h2 { margin: 0; font-size: 20px; font-weight: 600 }
-#peek .grid { align-content: start }
 
 /* ---------- context menu ---------- */
 

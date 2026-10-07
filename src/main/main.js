@@ -115,7 +115,7 @@ const handlers = {
   },
 
   // Returns the file content when it looks like text (no NUL bytes), otherwise null.
-  async peek(p, max = 4000) {
+  async readText(p, max = 4000) {
     let fh
     try {
       fh = await fsp.open(p)
