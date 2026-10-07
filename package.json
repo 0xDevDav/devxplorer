@@ -54,5 +54,10 @@
   },
   "dependencies": {
     "pdfjs-dist": "^6.4.299"
+  },
+  "homepage": "https://github.com/0xDevDav/devxplorer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xDevDav/devxplorer.git"
   }
 }
