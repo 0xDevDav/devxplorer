@@ -7,7 +7,7 @@ registerExtension(({ el, chip, setMeta, render, refreshViewer }) => {
   return {
     id: 'social',
     name: 'Social',
-    description: 'Stati di pubblicazione: da pubblicare, pubblicato, scartato. Filtri nella barra laterale e tasti 1/2/3 nell\'anteprima.',
+    description: 'Stati di pubblicazione: da pubblicare, pubblicato, scartato. Filtri nella barra in alto e tasti 1/2/3 nell\'anteprima.',
 
     badges: m => m.status ? [el('span', 'pill ' + m.status, STATUSES[m.status])] : [],
 
@@ -23,7 +23,7 @@ registerExtension(({ el, chip, setMeta, render, refreshViewer }) => {
       }))
     },
 
-    sidebar: all => Object.entries(STATUSES).map(([key, label]) => chip(
+    chips: all => Object.entries(STATUSES).map(([key, label]) => chip(
       filter === key,
       [el('i', 'dot ' + key), el('span', '', label), el('small', '', all.filter(m => m.status === key).length)],
       () => { filter = filter === key ? null : key; render() },

@@ -30,7 +30,7 @@ const state = {
   cwd: null,
   focus: null, // folder whose content is shown in the right pane
   meta: {}, // path -> annotations, filled from every listing
-  allMeta: [], // annotations of the whole library, for extension sidebars
+  allMeta: [], // annotations of the whole library, for extension filter chips
   places: [],
   drives: [],
   selection: new Set(),
@@ -44,8 +44,6 @@ const store = {
   set: (key, value) => { localStorage[key] = JSON.stringify(value) },
 }
 
-const treeExpanded = new Set(store.get('tree', []))
-const saveTree = () => store.set('tree', [...treeExpanded])
 let pins = store.get('pins', null)
 
 let tabs = []
@@ -93,7 +91,7 @@ const nameMatches = item => !state.query || item.name.toLowerCase().includes(sta
  *   badges(meta) -> Node[]            labels drawn on thumbnails and folder rows
  *   dimmed(meta) -> boolean           render the item faded
  *   menu(paths, metas) -> items[]     context menu entries for the selection
- *   sidebar(allMetas) -> Node[]       content of the extension's sidebar section
+ *   chips(allMetas) -> Node[]         filter chips shown in the places bar (none hides the group)
  *   filter: { active(), match(meta), reset() }
  *   viewer: { hint, onKey(event, path) -> boolean }
  */
@@ -321,7 +319,7 @@ async function render() {
 
   renderCrumbs()
   renderTabs()
-  renderExtensionSidebar()
+  renderExtensionFilters()
   paintSelection()
 }
 
@@ -601,7 +599,7 @@ const isPinned = p => pins.some(x => samePath(x.path, p))
 function togglePin(p) {
   pins = isPinned(p) ? pins.filter(x => !samePath(x.path, p)) : [...pins, { name: baseName(p), path: p }]
   store.set('pins', pins)
-  renderTree()
+  renderPlaces()
 }
 
 /* ========== context menu ========== */
@@ -730,59 +728,36 @@ function viewerKey(e) {
   else activeExtensions().some(x => x.viewer?.onKey?.(e, file.path))
 }
 
-/* ========== sidebar ========== */
+/* ========== places bar: favorites, drives, extension filters ========== */
 
-async function renderTree() {
-  const [favs, drives] = await Promise.all([
-    Promise.all(pins.map(p => treeNode(p.path, p.name, 0))),
-    Promise.all(state.drives.map(d => treeNode(d, `Disco (${d.slice(0, 2)})`, 0))),
-  ])
-  $('#favs').replaceChildren(...favs)
-  $('#pc').replaceChildren(...drives)
-}
-
-async function treeNode(dir, name, depth) {
-  const node = el('div', 'node')
-  const row = el('div', 'row' + (samePath(dir, state.cwd) ? ' active' : ''))
-  row.style.paddingLeft = 8 + depth * 14 + 'px'
-  const chev = el('span', 'chev', '›')
-  row.append(chev, el('span', 'label', name))
-  node.append(row)
-
-  if (treeExpanded.has(dir)) {
-    const folders = (await list(dir)).folders.sort(byName)
-    if (!folders.length) chev.classList.add('leaf')
-    else {
-      node.classList.add('open')
-      const children = el('div', 'kids')
-      children.append(...await Promise.all(folders.map(f => treeNode(f.path, f.name, depth + 1))))
-      node.append(children)
-    }
-  }
-
-  chev.onclick = e => {
-    e.stopPropagation()
-    treeExpanded.has(dir) ? treeExpanded.delete(dir) : treeExpanded.add(dir)
-    saveTree()
-    renderTree()
-  }
-  row.onclick = () => navigate(dir)
-  row.onauxclick = e => { if (e.button === 1) newTab(dir) }
-  row.oncontextmenu = e => showMenu(e, [
+function placeButton(dir, name, kind) {
+  const b = el('button', 'place ' + kind + (samePath(dir, state.cwd) ? ' active' : ''))
+  b.append(el('i', 'glyph'), el('span', '', name))
+  b.title = dir
+  b.onclick = () => navigate(dir)
+  b.onauxclick = e => { if (e.button === 1) newTab(dir) }
+  b.oncontextmenu = e => showMenu(e, [
     { label: 'Apri in una nuova scheda', run: () => newTab(dir) },
     { label: 'Apri in Esplora file', run: () => call('open', dir) },
     { label: isPinned(dir) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(dir) },
   ])
-  dropTarget(row, dir)
-  return node
+  dropTarget(b, dir)
+  return b
 }
 
-function renderExtensionSidebar() {
+function renderPlaces() {
+  $('#favs').replaceChildren(...pins.map(p => placeButton(p.path, p.name, 'folder')))
+  $('#drives').replaceChildren(...state.drives.map(d => placeButton(d, d.slice(0, 2), 'drive')))
+}
+
+function renderExtensionFilters() {
   const all = state.allMeta
-  $('#extside').replaceChildren(...activeExtensions().filter(x => x.sidebar).flatMap(x => {
-    const chips = el('div', 'chips')
-    chips.append(...x.sidebar(all))
-    return [el('h4', '', x.name), chips]
+  $('#extfilters').replaceChildren(...activeExtensions().filter(x => x.chips).flatMap(x => {
+    const chips = x.chips(all)
+    if (!chips.length) return []
+    const group = el('div', 'filter-group')
+    group.append(el('span', 'filter-label', x.name), ...chips)
+    return [group]
   }))
 }
 
@@ -867,7 +842,7 @@ function closeTab(i) {
   switchTab(tabIndex)
 }
 
-const refresh = () => Promise.all([renderTree(), render()])
+const refresh = () => Promise.all([renderPlaces(), render()])
 
 function setSort(value) {
   state.sort = localStorage.sort = value

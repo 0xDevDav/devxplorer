@@ -1,11 +1,11 @@
-// Free-form labels on files and folders, with a sidebar filter.
+// Free-form labels on files and folders, with filter chips in the places bar.
 registerExtension(({ el, chip, compare, ask, setMeta, render }) => {
   let filter = null
 
   return {
     id: 'tags',
     name: 'Tag',
-    description: 'Etichette libere (#cliente, #estate…) su file e cartelle, con filtro nella barra laterale.',
+    description: 'Etichette libere (#cliente, #estate…) su file e cartelle, con filtro nella barra in alto.',
 
     badges: m => (m.tags || []).map(t => el('span', 'tag', '#' + t)),
 
@@ -23,15 +23,14 @@ registerExtension(({ el, chip, compare, ask, setMeta, render }) => {
       ]
     },
 
-    sidebar(all) {
+    chips(all) {
       const counts = {}
       all.forEach(m => m.tags?.forEach(t => { counts[t] = (counts[t] || 0) + 1 }))
-      const chips = Object.keys(counts).sort(compare).map(t => chip(
+      return Object.keys(counts).sort(compare).map(t => chip(
         filter === t,
         [el('span', '', '#' + t), el('small', '', counts[t])],
         () => { filter = filter === t ? null : t; render() },
       ))
-      return chips.length ? chips : [el('p', 'hint', 'Nessun tag')]
     },
 
     filter: {
