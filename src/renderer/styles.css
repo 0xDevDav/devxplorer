@@ -356,6 +356,12 @@ button:disabled { opacity: .5; cursor: default }
 #infoBody dt { color: var(--muted); text-align: right }
 #infoBody dd { margin: 0; overflow-wrap: anywhere; user-select: text }
 
+/* A downloaded update, announced at the top right */
+.update-banner { position: fixed; top: 52px; right: 16px; z-index: 30; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; background: var(--surface); backdrop-filter: blur(20px); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow); animation: rise-in var(--normal) var(--ease) }
+.update-banner .icon { width: 18px; height: 18px; color: var(--accent) }
+.update-banner span { font-size: 12.5px; font-weight: 600 }
+.update-banner button { padding: 5px 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer }
+
 /* Progress of long file operations */
 #progress { position: fixed; right: 16px; bottom: 40px; z-index: 30; display: flex; flex-direction: column; gap: 8px; width: 300px }
 .progress-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "label cancel" "bar cancel" "detail cancel"; gap: 4px 10px; align-items: center; padding: 10px 10px 10px 14px; background: var(--surface); backdrop-filter: blur(20px); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow); animation: rise-in var(--normal) var(--ease) }

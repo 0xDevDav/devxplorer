@@ -12,6 +12,7 @@ const shellIntegration = require('./shell-integration')
 const { powershell, zip, unzip } = require('./powershell')
 const { validName, uniquePath } = require('./paths')
 const log = require('./log')
+const updates = require('./updates')
 const fileOps = require('./fileops')
 const { pickLanguage, translator } = require('../shared/messages')
 
@@ -502,6 +503,14 @@ const handlers = {
 
   cancelOperation(id) { operations.get(id)?.abort() },
 
+  checkForUpdates: () => updates.check(),
+  updateState: () => updates.state(),
+  // Restarts into the downloaded version; an open preview must not hold the window back.
+  installUpdate() {
+    quitting = true
+    updates.install()
+  },
+
   // Batches return { done: [[from, to]], error | cancelled }, so a partly completed batch can still be undone.
   move(paths, dest) { return runOperation(this, 'move', paths.length, options => ops.move(paths, dest, options)) },
   moveTo: pairs => ops.moveTo(pairs),
@@ -642,6 +651,7 @@ app.whenReady().then(() => {
   appearance = saved.appearance ?? { theme: 'system', glass: SUPPORTS_MICA }
   nativeTheme.themeSource = appearance.theme
   createWindow().webContents.once('did-finish-load', () => library.prune().catch(() => {}))
+  updates.start()
 })
 
 app.on('window-all-closed', () => {

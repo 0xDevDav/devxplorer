@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('api', {
   onOpenFolder: fn => ipcRenderer.on('open-folder', (e, dir) => fn(dir)),
   onCloseViewer: fn => ipcRenderer.on('close-viewer', fn),
   onProgress: fn => ipcRenderer.on('progress', (e, report) => fn(report)),
+  onUpdate: fn => ipcRenderer.on('update', (e, state) => fn(state)),
 })

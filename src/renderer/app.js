@@ -51,6 +51,7 @@ const ICONS = {
   drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+  download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
   cloud: '<path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.4 9.6 4.5 4.5 0 0 0 7 18.5z"/>',
   minus: '<path d="M5 12h14"/>',
   fitWidth: '<path d="M4 6v12M20 6v12M8 12h8M10.5 9.5 8 12l2.5 2.5M13.5 9.5 16 12l-2.5 2.5"/>',
@@ -2557,6 +2558,7 @@ function bindEvents() {
   }
   $('#exportBtn').onclick = exportLibrary
   $('#logBtn').onclick = () => call('showLog')
+  $('#updateBtn').onclick = () => updateState.status === 'ready' ? call('installUpdate') : call('checkForUpdates')
   $('#setupBtn').onclick = () => { $('#settings').close(); openSetup() }
   // The assistant is not dismissed with Esc: it ends with its last button.
   $('#setup').addEventListener('cancel', e => e.preventDefault())
@@ -2590,6 +2592,7 @@ function bindEvents() {
   api.onOpenFolder(dir => newTab(dir))
   api.onCloseViewer(closeViewer)
   api.onProgress(showProgress)
+  api.onUpdate(renderUpdate)
   // Picks up changes made by other programs while the window was in the background.
   window.addEventListener('focus', refresh)
   // Selections turn grey while the window is in the background, as on macOS.
@@ -2707,6 +2710,45 @@ function bindTooltips() {
   })
   document.addEventListener('pointerout', e => { if (tipTarget && !tipTarget.contains(e.relatedTarget)) hideTooltip() })
   for (const type of ['pointerdown', 'wheel', 'keydown', 'scroll']) document.addEventListener(type, hideTooltip, true)
+}
+
+/* ========== updates ========== */
+
+/*
+ * The General settings show the version and what the updater is doing; a downloaded update is
+ * announced once with a banner offering to restart, as macOS apps do.
+ */
+let updateState = { status: 'idle' }
+
+function renderUpdate(next = updateState) {
+  updateState = next
+  const { status, current, version, percent } = next
+  const text = {
+    checking: t('update.checking'),
+    latest: t('update.latest'),
+    downloading: t('update.downloading', { version, percent: percent ?? 0 }),
+    ready: t('update.ready', { version }),
+    error: t('update.error'),
+    dev: t('update.dev'),
+  }[status] || ''
+  $('#updateHint').textContent = [current && t('update.version', { version: current }), text].filter(Boolean).join(' · ')
+  const button = $('#updateBtn')
+  button.textContent = t(status === 'ready' ? 'update.restart' : 'update.check')
+  button.disabled = status === 'checking' || status === 'downloading'
+  if (status === 'ready' && !renderUpdate.announced) {
+    renderUpdate.announced = true
+    showUpdateBanner(version)
+  }
+}
+
+function showUpdateBanner(version) {
+  const banner = el('div', 'update-banner')
+  const restart = el('button', 'primary', t('update.restart'))
+  restart.onclick = () => call('installUpdate')
+  const later = el('button', '', t('update.later'))
+  later.onclick = () => banner.remove()
+  banner.append(icon('download'), el('span', '', t('update.ready', { version })), later, restart)
+  document.body.append(banner)
 }
 
 /* ========== setup assistant ========== */
@@ -2831,6 +2873,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   pins ??= init.places
   renderControls()
   applySizes()
+  call('updateState').then(next => next && renderUpdate(next))
   if (localStorage.setupDone !== 'true' && !init.secondary) openSetup(Number(localStorage.setupStep) || 0)
 
   secondaryWindow = init.secondary

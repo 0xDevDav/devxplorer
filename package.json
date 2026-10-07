@@ -11,7 +11,8 @@
     "start": "electron .",
     "test": "node --test",
     "icon": "electron scripts/make-icon.js",
-    "dist": "electron-builder --win nsis --x64"
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "release": "electron-builder --win nsis --x64 --publish always"
   },
   "build": {
     "appId": "com.devdav.devxplorer",
@@ -46,13 +47,21 @@
         "it_IT"
       ],
       "artifactName": "DevXplorer-Setup-${version}.exe"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "0xDevDav",
+        "repo": "devxplorer"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^44.6.0",
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "pdfjs-dist": "^6.4.299"
   },
   "homepage": "https://github.com/0xDevDav/devxplorer",
