@@ -9,6 +9,7 @@ const exif = require('./exif')
 const icons = require('./icons')
 const recycle = require('./recycle')
 const shellIntegration = require('./shell-integration')
+const { powershell, zip, unzip } = require('./powershell')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
@@ -60,14 +61,6 @@ async function uniquePath(p) {
   const stem = p.slice(0, p.length - ext.length)
   for (let i = 2; fs.existsSync(p); i++) p = `${stem} (${i})${ext}`
   return p
-}
-
-// PowerShell single-quoted literal, for paths passed into a -Command script.
-const psQuote = s => `'${s.replace(/'/g, "''")}'`
-
-function powershell(script) {
-  return new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
-    { windowsHide: true }, (error, stdout, stderr) => error ? reject(new Error(stderr.trim().split(/\r?\n/)[0] || error.message)) : resolve(stdout)))
 }
 
 // Starts a program on its own, outside the app's process tree and environment quirks.
@@ -151,11 +144,30 @@ const handlers = {
   watch(dir) {
     watcher?.close()
     try {
-      watcher = fs.watch(dir, () => {
+      // The folder going away (deleted, drive removed) shows up as an error or as a flood of events
+      // naming the folder itself; watching stops and the renderer moves to a folder that exists.
+      const gone = () => {
+        current.close()
+        if (watcher !== current) return
+        watcher = null
+        clearTimeout(watchTimer)
+        win?.webContents.send('changed')
+      }
+      const current = watcher = fs.watch(dir, (event, name) => {
+        if (name && path.isAbsolute(name)) return gone()
         clearTimeout(watchTimer)
         watchTimer = setTimeout(() => win?.webContents.send('changed'), 300)
       })
+      current.on('error', gone)
     } catch { watcher = null }
+  },
+
+  // The folder itself or its closest existing parent; the home folder when the whole drive is gone.
+  async nearestFolder(dir) {
+    for (let p = dir; ; p = path.dirname(p)) {
+      if ((await fsp.stat(p).catch(() => null))?.isDirectory()) return p
+      if (path.dirname(p) === p) return os.homedir()
+    }
   },
 
   async list(dir) {
@@ -318,17 +330,18 @@ const handlers = {
   // The Windows "Open with" chooser.
   openWith: p => launch('rundll32.exe', ['shell32.dll,OpenAs_RunDLL', p]),
 
-  runAsAdmin: p => powershell(`Start-Process -LiteralPath ${psQuote(p)} -Verb RunAs`).catch(() => null),
+  runAsAdmin: p => powershell('Start-Process -LiteralPath $env:DX_P -Verb RunAs', { P: p }).catch(() => null),
 
   /*
    * Windows Terminal when installed, otherwise the classic command prompt. wt.exe is an app
    * execution alias that only starts through the shell, hence Start-Process. Its -d argument is
-   * quoted by hand: a root like C:\ becomes C:\. so the closing quote is not escaped.
+   * quoted by hand: a root like C:\ becomes C:\. so the closing quote is not escaped, and ";"
+   * is escaped because wt reads it as a command separator.
    */
   openTerminal(dir) {
-    const wtArgs = psQuote(`-d "${dir.replace(/\\$/, '\\.')}"`)
-    return powershell(`try { Start-Process wt.exe -ArgumentList ${wtArgs} -ErrorAction Stop } catch { Start-Process cmd.exe -WorkingDirectory ${psQuote(dir)} }`)
-      .then(() => null)
+    const args = `-d "${dir.replace(/\\$/, '\\.').replace(/;/g, '\\;')}"`
+    return powershell('try { Start-Process wt.exe -ArgumentList $env:DX_ARGS -ErrorAction Stop } catch { Start-Process cmd.exe -WorkingDirectory $env:DX_DIR }',
+      { ARGS: args, DIR: dir }).then(() => null)
   },
 
   hasVsCode: () => !!VS_CODE,
@@ -347,14 +360,14 @@ const handlers = {
     const dir = path.dirname(paths[0])
     const base = paths.length === 1 ? path.basename(paths[0], fs.statSync(paths[0]).isDirectory() ? '' : path.extname(paths[0])) : t('zip.archive')
     const dest = await uniquePath(path.join(dir, base + '.zip'))
-    await powershell(`Compress-Archive -LiteralPath ${paths.map(psQuote).join(',')} -DestinationPath ${psQuote(dest)}`)
+    await zip(paths, dest)
     return dest
   },
 
   // Extracts a .zip into a new folder named after it.
   async extract(p) {
     const dest = await uniquePath(path.join(path.dirname(p), path.basename(p, path.extname(p))))
-    await powershell(`Expand-Archive -LiteralPath ${psQuote(p)} -DestinationPath ${psQuote(dest)}`)
+    await unzip(p, dest)
     return dest
   },
 

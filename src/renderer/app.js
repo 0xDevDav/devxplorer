@@ -1892,7 +1892,12 @@ function closeTab(i) {
   switchTab(tabIndex)
 }
 
-const refresh = () => Promise.all([renderPlaces(), render()])
+// The open folder may have been deleted or its drive removed: then the closest folder that exists opens.
+async function refresh() {
+  const existing = state.cwd && await call('nearestFolder', state.cwd)
+  if (existing && !samePath(existing, state.cwd)) return navigate(existing)
+  return Promise.all([renderPlaces(), render()])
+}
 
 function setSort(value) {
   state.sort = localStorage.sort = value
