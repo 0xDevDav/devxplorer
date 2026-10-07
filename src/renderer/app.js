@@ -146,14 +146,6 @@ let pins = store.get('pins', null)
 let tabs = []
 let tabIndex = 0
 const currentTab = () => tabs[tabIndex]
-// History (back/forward) belongs to the session; only each tab's folder is remembered.
-// Only the first window's tabs are remembered; windows opened later are for the moment at hand.
-let secondaryWindow = false
-const saveTabs = () => {
-  if (secondaryWindow) return
-  store.set('tabs', tabs.map(({ cwd, focus }) => ({ cwd, focus })))
-  store.set('tabIndex', tabIndex)
-}
 
 async function call(name, ...args) {
   try {
@@ -944,7 +936,6 @@ function setView(view) {
 function setFocus(path) {
   state.focus = path
   currentTab().focus = path
-  saveTabs()
 }
 
 function focusEntry(entry) {
@@ -2192,7 +2183,6 @@ function navigate(dir, focus = null) {
     tab.forward = []
   }
   Object.assign(tab, { cwd: dir, focus })
-  saveTabs()
   return showTab()
 }
 
@@ -2204,7 +2194,6 @@ function goHistory(step) {
   if (!entry) return
   tab[to] = [...(tab[to] || []), { cwd: tab.cwd, focus: tab.focus }]
   Object.assign(tab, entry)
-  saveTabs()
   return showTab()
 }
 
@@ -2368,7 +2357,6 @@ function typeToSelect(char) {
 
 function switchTab(i) {
   tabIndex = (i + tabs.length) % tabs.length
-  saveTabs()
   showTab()
 }
 
@@ -2897,16 +2885,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   call('updateState').then(next => next && renderUpdate(next))
   if (localStorage.setupDone !== 'true' && !init.secondary) openSetup(Number(localStorage.setupStep) || 0)
 
-  secondaryWindow = init.secondary
-  const saved = secondaryWindow ? [] : store.get('tabs', []).filter(tab => tab?.cwd)
-  const existing = (await call('items', saved.map(tab => tab.cwd))) || []
-  tabs = saved.filter(tab => existing.some(i => samePath(i.path, tab.cwd)))
-  tabIndex = Math.max(0, Math.min(store.get('tabIndex', 0), tabs.length - 1))
-  if (init.start) {
-    tabs.push({ cwd: init.start, focus: null })
-    tabIndex = tabs.length - 1
-  }
-  // A first start opens the Desktop: a place everyone recognises at a glance.
-  if (!tabs.length) tabs = [{ cwd: init.places.find(p => p.kind === 'desktop').path, focus: null }]
+  // Like File Explorer, a window starts with a single tab: the folder it was opened on (a double
+  // click, Win+E, the menu), otherwise the Desktop, a place everyone recognises at a glance.
+  tabs = [{ cwd: init.start || init.places.find(p => p.kind === 'desktop').path, focus: null }]
+  tabIndex = 0
   showTab()
 })

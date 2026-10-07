@@ -216,7 +216,7 @@ async function runOperation(win, kind, count, work) {
 }
 
 const handlers = {
-  // The first window restores the saved tabs; later ones open on their own folder only.
+  // Windows opened from another one (Ctrl+N) are secondary: they skip the setup assistant.
   async init() {
     return {
     secondary: !!this.startFolder,
@@ -607,7 +607,7 @@ const CRASH_LIMIT = 3
 const CRASH_WINDOW_MS = 60000
 
 /*
- * Opens a window on startFolder (null: the first window, which restores the saved tabs). A window
+ * Opens a window on startFolder (null: the folder passed on the command line, or the Desktop). A window
  * opened from another one cascades from its position.
  */
 function createWindow(startFolder = null, from = null) {
