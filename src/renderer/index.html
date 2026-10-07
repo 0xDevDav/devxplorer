@@ -60,6 +60,7 @@
         <button type="button" data-pane="general"><span class="tile gray" data-icon="gear"></span><span data-i18n="settings.general"></span></button>
         <button type="button" data-pane="appearance"><span class="tile blue" data-icon="appearance"></span><span data-i18n="settings.appearance"></span></button>
         <button type="button" data-pane="extensions"><span class="tile green" data-icon="extensions"></span><span data-i18n="extensions.title"></span></button>
+        <button type="button" data-pane="keyboard"><span class="tile indigo" data-icon="keyboard"></span><span data-i18n="keys.title"></span></button>
         <button type="button" data-pane="library"><span class="tile orange" data-icon="library"></span><span data-i18n="settings.library"></span></button>
       </nav>
       <div class="settings-body" tabindex="-1" autofocus>
@@ -90,6 +91,10 @@
           <h2 data-i18n="extensions.title"></h2>
           <p class="hint lead" data-i18n="extensions.hint"></p>
           <div id="extList" class="set-group"></div>
+        </section>
+        <section class="pane" data-pane="keyboard">
+          <h2 data-i18n="keys.title"></h2>
+          <div id="shortcutList"></div>
         </section>
         <section class="pane" data-pane="library">
           <h2 data-i18n="settings.library"></h2>

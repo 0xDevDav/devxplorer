@@ -60,6 +60,7 @@ const ICONS = {
   group: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>',
   appearance: '<circle cx="12" cy="12" r="8"/><path fill="currentColor" stroke="none" d="M12 4a8 8 0 0 1 0 16z"/>',
   extensions: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/>',
+  keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M8 14h8"/>',
   library: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
   gear: '<path d="M19.23 10.41L21.53 10.87L21.53 13.13L19.23 13.59L18.23 15.99L19.54 17.94L17.94 19.54L15.99 18.23L13.59 19.23L13.13 21.53L10.87 21.53L10.41 19.23L8.01 18.23L6.06 19.54L4.46 17.94L5.77 15.99L4.77 13.59L2.47 13.13L2.47 10.87L4.77 10.41L5.77 8.01L4.46 6.06L6.06 4.46L8.01 5.77L10.41 4.77L10.87 2.47L13.13 2.47L13.59 4.77L15.99 5.77L17.94 4.46L19.54 6.06L18.23 8.01Z"/><circle cx="12" cy="12" r="3"/>',
   play: '<path fill="currentColor" stroke="none" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',
@@ -352,8 +353,81 @@ function openSettings() {
     row.append(text, toggle, el('span', 'switch'))
     return row
   }))
+  renderShortcuts()
   showSettingsPane(settingsPane)
   $('#settings').showModal()
+}
+
+/*
+ * Keyboard shortcuts listed in Settings. Alternatives are separated by "|", keys of a combination
+ * by "+"; names starting with "key." are translated.
+ */
+const SHORTCUTS = [
+  ['keys.group.navigation', [
+    ['Ctrl+K', 'keys.palette'],
+    ['Ctrl+L', 'keys.path'],
+    ['↑|↓', 'keys.folders'],
+    ['→|key.enter', 'keys.open'],
+    ['←|key.backspace', 'keys.up'],
+    ['A–Z', 'keys.typeSelect'],
+  ]],
+  ['keys.group.tabs', [
+    ['Ctrl+T', 'keys.newTab'],
+    ['Ctrl+W', 'keys.closeTab'],
+    ['Ctrl+Tab|Ctrl+Shift+Tab', 'keys.switchTab'],
+  ]],
+  ['keys.group.files', [
+    ['key.space', 'keys.preview'],
+    ['key.enter', 'menu.open'],
+    ['F2', 'keys.rename'],
+    ['key.delete', 'menu.trash'],
+    ['Ctrl+C', 'menu.copy'],
+    ['Ctrl+X', 'menu.cut'],
+    ['Ctrl+V', 'menu.paste'],
+    ['Ctrl+D', 'menu.duplicate'],
+    ['Ctrl+Shift+C', 'menu.copyPath'],
+    ['Ctrl+Z', 'keys.undo'],
+    ['Ctrl+A', 'keys.selectAll'],
+    ['Esc', 'keys.deselect'],
+  ]],
+  ['keys.group.view', [
+    ['Ctrl++|Ctrl+-|Ctrl+key.wheel', 'keys.zoom'],
+    ['Ctrl+0', 'keys.zoomReset'],
+  ]],
+  ['keys.group.viewer', [
+    ['←|→', 'keys.browse'],
+    ['+|-|key.wheel', 'keys.zoomImage'],
+    ['I', 'keys.info'],
+    ['B', 'keys.matte'],
+    ['key.enter', 'keys.openInProgram'],
+    ['key.space|Esc', 'keys.close'],
+  ]],
+]
+
+function keysNode(spec) {
+  const node = el('div', 'keys')
+  spec.split('|').forEach((combo, i) => {
+    if (i) node.append('/')
+    // "+" splits keys unless it is the key itself, as in Ctrl++
+    for (const key of combo.split(/\+(?=.)/)) node.append(el('kbd', 'keycap', key.startsWith('key.') ? t(key) : key))
+  })
+  return node
+}
+
+function renderShortcuts() {
+  const groups = [
+    ...SHORTCUTS.map(([title, rows]) => [t(title), rows.map(([keys, label]) => [keys, t(label)])]),
+    ...activeExtensions().filter(x => x.shortcuts).map(x => [x.name, x.shortcuts]),
+  ]
+  $('#shortcutList').replaceChildren(...groups.flatMap(([title, rows]) => {
+    const group = el('div', 'set-group')
+    group.append(...rows.map(([keys, label]) => {
+      const row = el('div', 'set-row')
+      row.append(el('span', '', label), keysNode(keys))
+      return row
+    }))
+    return [el('p', 'set-label', title), group]
+  }))
 }
 
 let settingsPane = 'general'

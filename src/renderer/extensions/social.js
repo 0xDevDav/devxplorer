@@ -8,6 +8,7 @@ registerExtension(({ language, el, chip, setMeta, render, refreshViewer }) => {
       done: 'Published',
       drop: 'Discarded',
       hint: '1 To publish · 2 Published · 3 Discarded · 0 none',
+      none: 'No status',
     },
     it: {
       name: 'Social',
@@ -16,6 +17,7 @@ registerExtension(({ language, el, chip, setMeta, render, refreshViewer }) => {
       done: 'Pubblicato',
       drop: 'Scartato',
       hint: '1 Da pubblicare · 2 Pubblicato · 3 Scartato · 0 nessuno',
+      none: 'Nessuno stato',
     },
   }
   const text = STRINGS[language] || STRINGS.en
@@ -54,6 +56,9 @@ registerExtension(({ language, el, chip, setMeta, render, refreshViewer }) => {
       match: m => m.status === filter,
       reset: () => { filter = null },
     },
+
+    // Listed under Keyboard in Settings.
+    shortcuts: [['1', text.todo], ['2', text.done], ['3', text.drop], ['0', text.none]],
 
     viewer: {
       hint: text.hint,
