@@ -902,7 +902,12 @@ function bindEvents() {
   document.addEventListener('mousedown', e => { if (!$('#menu').contains(e.target)) $('#menu').hidden = true })
 
   document.addEventListener('keydown', e => {
-    if ($('dialog[open]') || e.target.closest?.('input, select')) return
+    if ($('dialog[open]')) return
+    if (e.ctrlKey && !viewerOpen()) {
+      const step = { '+': 1, '=': 1, '-': -1, '0': 0 }[e.key]
+      if (step !== undefined) { e.preventDefault(); return zoom(step) }
+    }
+    if (e.target.closest?.('input, select')) return
     if (viewerOpen()) return viewerKey(e)
 
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
@@ -939,7 +944,12 @@ function bindEvents() {
     clearTimeout(state.queryTimer)
     state.queryTimer = setTimeout(render, 200)
   }
-  $('#size').oninput = e => { localStorage.size = e.target.value; applySize() }
+  // Ctrl + wheel resizes thumbnails instead of zooming the whole window.
+  document.addEventListener('wheel', e => {
+    if (!e.ctrlKey) return
+    e.preventDefault()
+    zoom(e.deltaY < 0 ? 1 : -1)
+  }, { passive: false })
 
   systemDark.addEventListener('change', applyTheme)
   api.onChanged(refresh)
@@ -947,7 +957,22 @@ function bindEvents() {
   window.addEventListener('focus', refresh)
 }
 
-const applySize = () => document.body.style.setProperty('--size', $('#size').value + 'px')
+/* ========== thumbnail size (Ctrl + / Ctrl - / Ctrl 0 / Ctrl + wheel) ========== */
+
+const SIZES = [110, 130, 150, 170, 200, 230, 270, 320]
+const DEFAULT_SIZE = 170
+
+function applySize() {
+  document.body.style.setProperty('--size', (Number(localStorage.size) || DEFAULT_SIZE) + 'px')
+}
+
+function zoom(step) {
+  const current = Number(localStorage.size) || DEFAULT_SIZE
+  const index = SIZES.findIndex(s => s >= current)
+  const next = step === 0 ? DEFAULT_SIZE : SIZES[Math.max(0, Math.min(SIZES.length - 1, (index < 0 ? SIZES.length - 1 : index) + step))]
+  localStorage.size = next
+  applySize()
+}
 
 /* ========== startup ========== */
 
@@ -959,7 +984,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   Object.assign(state, { places: init.places, drives: init.drives })
   pins ??= init.places
   $('#sort').value = state.sort
-  $('#size').value = localStorage.size || 170
   applySize()
 
   const saved = store.get('tabs', []).filter(t => t?.cwd)

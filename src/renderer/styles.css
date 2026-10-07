@@ -167,7 +167,6 @@ button, .row, .frow, .item, .chip, .tab, #toolbar, #side, #folders, .sec {
 #q, #sort { padding: 5px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast) }
 #q { width: 220px }
 #q:focus { border-color: var(--accent) }
-#size { width: 90px; accent-color: var(--accent) }
 #settingsBtn { width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer }
 #settingsBtn:hover { background: var(--panel2); border-color: var(--line); color: var(--text) }
 
