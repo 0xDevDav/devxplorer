@@ -749,12 +749,20 @@ function hoverPlay(card, thumb, file) {
   card.addEventListener('mouseleave', stop)
 }
 
+// Card names leave out the extension, which is shown as a label on the preview instead.
+function displayName(name) {
+  const ext = extensionOf(name)
+  return ext && name.length > ext.length + 1 ? name.slice(0, -ext.length - 1) : name
+}
+
 function fileCard(file, siblings) {
   const card = el('div', 'item' + (dimmed(file.path) ? ' dim' : ''))
   const thumb = el('div', 'thumb')
   thumb.append(previewImg(file), badges(file.path))
   if (file.type === 'video') thumb.append(icon('play', 'play'))
-  card.append(thumb, el('div', 'name', file.name))
+  const name = displayName(file.name)
+  if (name !== file.name) thumb.append(el('span', 'ext', extensionOf(file.name)))
+  card.append(thumb, el('div', 'name', name))
   card.title = file.path
   selectable(card, file.path, false)
   hoverPlay(card, thumb, file)
