@@ -905,7 +905,7 @@ function bindEvents() {
     if ($('dialog[open]')) return
     if (e.ctrlKey && !viewerOpen()) {
       const step = { '+': 1, '=': 1, '-': -1, '0': 0 }[e.key]
-      if (step !== undefined) { e.preventDefault(); return zoom(step) }
+      if (step !== undefined) { e.preventDefault(); return zoom(pointerSection, step) }
     }
     if (e.target.closest?.('input, select')) return
     if (viewerOpen()) return viewerKey(e)
@@ -944,11 +944,12 @@ function bindEvents() {
     clearTimeout(state.queryTimer)
     state.queryTimer = setTimeout(render, 200)
   }
-  // Ctrl + wheel resizes thumbnails instead of zooming the whole window.
+  // Ctrl + wheel resizes the section under the pointer instead of zooming the whole window.
+  document.addEventListener('pointerover', e => { pointerSection = sectionOf(e.target) })
   document.addEventListener('wheel', e => {
     if (!e.ctrlKey) return
     e.preventDefault()
-    zoom(e.deltaY < 0 ? 1 : -1)
+    zoom(sectionOf(e.target), e.deltaY < 0 ? 1 : -1)
   }, { passive: false })
 
   systemDark.addEventListener('change', applyTheme)
@@ -957,21 +958,30 @@ function bindEvents() {
   window.addEventListener('focus', refresh)
 }
 
-/* ========== thumbnail size (Ctrl + / Ctrl - / Ctrl 0 / Ctrl + wheel) ========== */
+/*
+ * ========== zoom (Ctrl + / Ctrl - / Ctrl 0 / Ctrl + wheel) ==========
+ * Each section has its own size and the shortcuts act on the one under the pointer:
+ * the folder list scales its collages, the content pane its thumbnails.
+ */
 
-const SIZES = [110, 130, 150, 170, 200, 230, 270, 320]
-const DEFAULT_SIZE = 170
+const ZOOM = {
+  folders: { key: 'rowSize', cssVar: '--row-size', steps: [36, 44, 52, 64, 80, 100, 124], fallback: 52 },
+  content: { key: 'size', cssVar: '--size', steps: [110, 130, 150, 170, 200, 230, 270, 320], fallback: 170 },
+}
+let pointerSection = 'content'
+const sectionOf = node => node?.closest?.('#folders') ? 'folders' : 'content'
+const zoomValue = z => Number(localStorage[z.key]) || z.fallback
 
-function applySize() {
-  document.body.style.setProperty('--size', (Number(localStorage.size) || DEFAULT_SIZE) + 'px')
+function applySizes() {
+  for (const z of Object.values(ZOOM)) document.body.style.setProperty(z.cssVar, zoomValue(z) + 'px')
 }
 
-function zoom(step) {
-  const current = Number(localStorage.size) || DEFAULT_SIZE
-  const index = SIZES.findIndex(s => s >= current)
-  const next = step === 0 ? DEFAULT_SIZE : SIZES[Math.max(0, Math.min(SIZES.length - 1, (index < 0 ? SIZES.length - 1 : index) + step))]
-  localStorage.size = next
-  applySize()
+function zoom(section, step) {
+  const z = ZOOM[section]
+  const index = z.steps.findIndex(s => s >= zoomValue(z))
+  const from = index < 0 ? z.steps.length - 1 : index
+  localStorage[z.key] = step === 0 ? z.fallback : z.steps[Math.max(0, Math.min(z.steps.length - 1, from + step))]
+  applySizes()
 }
 
 /* ========== startup ========== */
@@ -984,7 +994,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   Object.assign(state, { places: init.places, drives: init.drives })
   pins ??= init.places
   $('#sort').value = state.sort
-  applySize()
+  applySizes()
 
   const saved = store.get('tabs', []).filter(t => t?.cwd)
   const existing = (await call('items', saved.map(t => t.cwd))) || []
