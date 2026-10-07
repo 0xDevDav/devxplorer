@@ -6,6 +6,7 @@ const path = require('path')
 const library = require('./library')
 const exif = require('./exif')
 const recycle = require('./recycle')
+const shellIntegration = require('./shell-integration')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
@@ -65,6 +66,7 @@ let win = null
 let chrome = null
 // Error messages and dialogs follow the language the renderer reports (system locale until then).
 let t = translator('en')
+let currentLanguage = null
 let appearance = null
 let watcher = null
 let watchTimer = null
@@ -100,7 +102,7 @@ const libraryFilter = () => [{ name: t('library.fileType'), extensions: ['db'] }
 const handlers = {
   init: () => ({
     supportsGlass: SUPPORTS_MICA,
-    start: startFolder(),
+    start: folderArgument(process.argv),
     places: ['desktop', 'pictures', 'videos', 'documents', 'downloads'].map(kind => ({ path: app.getPath(kind), kind })),
     drives: [...'CDEFGHIJKLMNOPQRSTUVWXYZ'].map(c => c + ':\\').filter(d => fs.existsSync(d)),
   }),
@@ -197,8 +199,21 @@ const handlers = {
   },
 
   // Keeps system-drawn surfaces (Mica, native dialogs) in the app's theme and toggles the glass material.
+  shellIntegration: () => shellIntegration.isEnabled(),
+
+  async setShellIntegration(enabled) {
+    if (enabled) await shellIntegration.enable(t('shell.openIn'), launchCommand())
+    else await shellIntegration.disable()
+    return shellIntegration.isEnabled()
+  },
+
   appearance({ theme, glass, language }) {
-    if (language) t = translator(language)
+    if (language && language !== currentLanguage) {
+      currentLanguage = language
+      t = translator(language)
+      // keep the File Explorer entry in the app language
+      shellIntegration.isEnabled().then(on => on && shellIntegration.enable(t('shell.openIn'), launchCommand()))
+    }
     appearance = { theme, glass: SUPPORTS_MICA && glass }
     nativeTheme.themeSource = theme
     if (!SUPPORTS_MICA) return
@@ -289,12 +304,25 @@ const handlers = {
 for (const [name, fn] of Object.entries(handlers)) ipcMain.handle(name, (e, ...args) => fn(...args))
 
 // A folder passed on the command line (e.g. from a shell "Open with" entry) wins over the last session.
-function startFolder() {
+function folderArgument(argv) {
   const appPath = lower(app.getAppPath())
-  return process.argv.slice(1).find(a =>
+  return argv.slice(1).find(a =>
     !a.startsWith('-') && a !== '.' && lower(path.resolve(a)) !== appPath &&
     fs.existsSync(a) && fs.statSync(a).isDirectory())
 }
+
+// How Windows should start the app: the packaged executable, or Electron with the project path.
+const launchCommand = () => app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]
+
+// A single window: launching again (e.g. from File Explorer) opens the folder in a new tab.
+if (!app.requestSingleInstanceLock()) app.quit()
+app.on('second-instance', (e, argv) => {
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.focus()
+  const folder = folderArgument(argv)
+  if (folder) win.webContents.send('open-folder', folder)
+})
 
 // Native drag lets files be dropped into other apps (File Explorer, browsers) as well as back into this window.
 const EMPTY_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='

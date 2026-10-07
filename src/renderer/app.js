@@ -324,6 +324,7 @@ function openSettings() {
   renderAccentPicker()
   $('#glassRow').hidden = !state.supportsGlass
   $('#glassToggle').checked = glassOn()
+  call('shellIntegration').then(on => { $('#shellToggle').checked = !!on })
   $('#extList').replaceChildren(...extensions.map(x => {
     const row = el('label', 'ext-row')
     const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
@@ -1644,6 +1645,9 @@ function bindEvents() {
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
   $('#settingsBtn').replaceChildren(icon('gear'))
   $('#settingsBtn').onclick = openSettings
+  $('#shellToggle').onchange = async e => {
+    e.target.checked = !!(await call('setShellIntegration', e.target.checked))
+  }
   $('#glassToggle').onchange = e => {
     localStorage.glass = e.target.checked
     applyTheme()
@@ -1673,6 +1677,7 @@ function bindEvents() {
 
   systemDark.addEventListener('change', applyTheme)
   api.onChanged(refresh)
+  api.onOpenFolder(dir => newTab(dir))
   // Picks up changes made by other programs while the window was in the background.
   window.addEventListener('focus', refresh)
 }

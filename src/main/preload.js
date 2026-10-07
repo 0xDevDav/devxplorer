@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('api', {
   drag: (paths, icon) => ipcRenderer.send('drag', paths, icon),
   pathFor: file => webUtils.getPathForFile(file),
   onChanged: fn => ipcRenderer.on('changed', fn),
+  onOpenFolder: fn => ipcRenderer.on('open-folder', (e, dir) => fn(dir)),
 })
