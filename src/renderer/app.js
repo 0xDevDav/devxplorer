@@ -677,6 +677,56 @@ function folderTile(folder) {
   return tile
 }
 
+/*
+ * Resting the pointer on a video or GIF plays it inside its card, muted and looping, without
+ * opening anything. Any movement restarts the wait, so sweeping across the grid starts nothing;
+ * leaving the card stops playback and releases the decoder.
+ */
+const HOVER_PLAY_MS = 500
+const ANIMATED = file => file.type === 'video' || /\.gif$/i.test(file.name)
+
+function hoverPlay(card, thumb, file) {
+  if (!ANIMATED(file)) return
+  let timer = null
+  let live = null
+
+  const start = () => {
+    // handlers keep their own reference: events can still arrive after stop() cleared `live`
+    if (file.type === 'video') {
+      const video = Object.assign(el('video', 'live'), { src: fileUrl(file.path), muted: true, loop: true, autoplay: true, playsInline: true })
+      const bar = el('div', 'live-progress')
+      video.addEventListener('timeupdate', () => { bar.style.width = (video.currentTime / video.duration) * 100 + '%' })
+      video.addEventListener('playing', () => { video.classList.add('show'); if (live === video) thumb.append(bar) }, { once: true })
+      video.addEventListener('error', () => { if (live === video) stop() }, { once: true }) // undecodable codecs keep the still frame
+      video.bar = bar
+      live = video
+    } else {
+      const image = Object.assign(el('img', 'live'), { src: fileUrl(file.path) })
+      image.addEventListener('load', () => image.classList.add('show'), { once: true })
+      live = image
+    }
+    thumb.append(live)
+  }
+
+  function stop() {
+    clearTimeout(timer)
+    if (!live) return
+    live.bar?.remove()
+    if (live.tagName === 'VIDEO') { live.pause(); live.removeAttribute('src'); live.load() }
+    live.remove()
+    live = null
+  }
+
+  const wait = () => {
+    if (live) return
+    clearTimeout(timer)
+    timer = setTimeout(start, HOVER_PLAY_MS)
+  }
+  card.addEventListener('mouseenter', wait)
+  card.addEventListener('mousemove', wait)
+  card.addEventListener('mouseleave', stop)
+}
+
 function fileCard(file, siblings) {
   const card = el('div', 'item' + (dimmed(file.path) ? ' dim' : ''))
   const thumb = el('div', 'thumb')
@@ -685,6 +735,7 @@ function fileCard(file, siblings) {
   card.append(thumb, el('div', 'name', file.name))
   card.title = file.path
   selectable(card, file.path, false)
+  hoverPlay(card, thumb, file)
   // Double click opens photos and videos in the viewer and every other file in its default program;
   // Space previews any file (see preview below).
   const isMedia = f => f.type === 'img' || f.type === 'video'

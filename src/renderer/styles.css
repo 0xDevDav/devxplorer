@@ -404,6 +404,13 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 .paper:not(.instant) { animation: fade-in var(--normal) ease-out }
 
 .thumb .play { position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px; padding: 7px 6px 7px 8px; border-radius: 50%; color: #fff; background: #0009; backdrop-filter: blur(6px) }
+/* hover playback inside the card */
+.thumb .live { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--normal) var(--ease) }
+.thumb .live.show { opacity: 1 }
+.thumb .badges { z-index: 1 }
+.thumb:has(.live.show) .play { opacity: 0 }
+.thumb .play { transition: opacity var(--fast) }
+.live-progress { position: absolute; left: 0; bottom: 0; z-index: 1; width: 0; height: 3px; background: var(--accent); pointer-events: none }
 .badges { display: flex; flex-wrap: wrap; gap: 4px }
 .pill { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #111 }
 .tag { padding: 1px 7px; border-radius: 999px; font-size: 11px; color: #eee; background: #000a; backdrop-filter: blur(6px) }
