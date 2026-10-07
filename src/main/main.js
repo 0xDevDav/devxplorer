@@ -10,6 +10,7 @@ const icons = require('./icons')
 const recycle = require('./recycle')
 const shellIntegration = require('./shell-integration')
 const { powershell, zip, unzip } = require('./powershell')
+const { validName, uniquePath } = require('./paths')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
@@ -33,7 +34,6 @@ async function removeStrayNul(p) {
   if (stat?.isFile() && stat.size <= STRAY_NUL_MAX) await fsp.unlink(p).catch(() => {})
 }
 
-const INVALID_NAME = /[<>:"/\\|?*]|[. ]$/
 const TRANSPARENT = '#00000000'
 // The Mica material needs Windows 11 22H2 (build 22621) or later.
 const SUPPORTS_MICA = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621
@@ -53,14 +53,7 @@ const lower = p => p.toLowerCase()
 const isUnder = (p, dir) => lower(p) === lower(dir) || lower(p).startsWith(lower(dir).replace(/\\$/, '') + path.sep)
 
 function checkName(name) {
-  if (!name || INVALID_NAME.test(name)) throw new Error(t('error.invalidName', { name }))
-}
-
-async function uniquePath(p) {
-  const ext = path.extname(p)
-  const stem = p.slice(0, p.length - ext.length)
-  for (let i = 2; fs.existsSync(p); i++) p = `${stem} (${i})${ext}`
-  return p
+  if (!validName(name)) throw new Error(t('error.invalidName', { name }))
 }
 
 // Starts a program on its own, outside the app's process tree and environment quirks.
@@ -350,7 +343,7 @@ const handlers = {
   // A .lnk next to the item, named as Windows names new shortcuts.
   async createShortcut(p) {
     const name = t('shortcut.name', { name: path.basename(p, path.extname(p)) })
-    const link = await uniquePath(path.join(path.dirname(p), name + '.lnk'))
+    const link = uniquePath(path.join(path.dirname(p), name + '.lnk'))
     if (!shell.writeShortcutLink(link, { target: p })) throw new Error(t('error.shortcut'))
     return link
   },
@@ -359,14 +352,14 @@ const handlers = {
   async compress(paths) {
     const dir = path.dirname(paths[0])
     const base = paths.length === 1 ? path.basename(paths[0], fs.statSync(paths[0]).isDirectory() ? '' : path.extname(paths[0])) : t('zip.archive')
-    const dest = await uniquePath(path.join(dir, base + '.zip'))
+    const dest = uniquePath(path.join(dir, base + '.zip'))
     await zip(paths, dest)
     return dest
   },
 
   // Extracts a .zip into a new folder named after it.
   async extract(p) {
-    const dest = await uniquePath(path.join(path.dirname(p), path.basename(p, path.extname(p))))
+    const dest = uniquePath(path.join(path.dirname(p), path.basename(p, path.extname(p))))
     await unzip(p, dest)
     return dest
   },
@@ -376,7 +369,7 @@ const handlers = {
     const moved = []
     for (const p of paths) {
       if (lower(path.dirname(p)) === lower(dest) || isUnder(dest, p)) continue
-      const to = await uniquePath(path.join(dest, path.basename(p)))
+      const to = uniquePath(path.join(dest, path.basename(p)))
       await moveItem(p, to)
       moved.push([p, to])
     }
@@ -396,7 +389,7 @@ const handlers = {
     const copied = []
     for (const p of paths) {
       if (isUnder(dest, p) && lower(path.dirname(p)) !== lower(dest)) continue
-      const to = await uniquePath(path.join(dest, path.basename(p)))
+      const to = uniquePath(path.join(dest, path.basename(p)))
       await fsp.cp(p, to, { recursive: true, errorOnExist: true, force: false })
       copied.push([p, to])
     }
@@ -442,7 +435,7 @@ const handlers = {
 
   async mkdir(dir, name) {
     checkName(name)
-    const target = await uniquePath(path.join(dir, name))
+    const target = uniquePath(path.join(dir, name))
     await fsp.mkdir(target)
     return target
   },

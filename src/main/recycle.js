@@ -3,10 +3,13 @@
  *
  * Each deleted item lives in <drive>\$Recycle.Bin\<user SID>\ as a pair of entries with the same
  * suffix: "$R…" is the item itself and "$I…" records its original path and deletion time.
- * Restoring moves "$R…" back to the original path and removes "$I…", as Windows does.
+ * Restoring moves "$R…" back to the original path and removes "$I…", as Windows does. When an
+ * item with the same name has been created there since, the restored one gets a free name instead
+ * of replacing it.
  */
 const fsp = require('fs').promises
 const path = require('path')
+const { uniquePath } = require('./paths')
 
 // Parses an "$I" record: version 1 (Windows Vista to 8.1) or 2 (Windows 10 and later).
 function parseIndex(buf) {
@@ -40,13 +43,17 @@ async function restore(paths) {
   }
 
   const restored = []
-  for (const { original, dir, suffix } of latest.values()) {
-    await fsp.mkdir(path.dirname(original), { recursive: true })
-    await fsp.rename(path.join(dir, '$R' + suffix), original)
-    await fsp.rm(path.join(dir, '$I' + suffix), { force: true })
-    restored.push(original)
-  }
+  for (const { original, dir, suffix } of latest.values()) restored.push(await putBack(dir, suffix, original))
   return restored
 }
 
-module.exports = { restore, parseIndex }
+// Moves one "$R…" item back next to its original location; returns where it ended up.
+async function putBack(dir, suffix, original) {
+  await fsp.mkdir(path.dirname(original), { recursive: true })
+  const target = uniquePath(original)
+  await fsp.rename(path.join(dir, '$R' + suffix), target)
+  await fsp.rm(path.join(dir, '$I' + suffix), { force: true })
+  return target
+}
+
+module.exports = { restore, parseIndex, putBack }
