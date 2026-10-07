@@ -57,39 +57,56 @@
 
   <dialog id="settings">
     <form method="dialog">
-      <h2 data-i18n="settings.title"></h2>
-      <div class="settings-grid">
-        <section>
-          <h3 data-i18n="settings.appearance"></h3>
-          <div id="themePicker" class="segmented"></div>
-          <div id="accentPicker" class="swatches"></div>
-          <label id="glassRow" class="ext-row glass-row" hidden>
-            <div><b data-i18n="glass.title"></b><p class="hint" data-i18n="glass.hint"></p></div>
-            <input type="checkbox" id="glassToggle"><span class="switch"></span>
-          </label>
-          <h3 class="section" data-i18n="settings.language"></h3>
-          <div id="languagePicker" class="segmented"></div>
-        </section>
-        <section>
-          <h3 data-i18n="extensions.title"></h3>
-          <p class="hint" data-i18n="extensions.hint"></p>
-          <div id="extList"></div>
-        </section>
-        <section>
-          <h3 data-i18n="settings.integration"></h3>
-          <label class="ext-row">
-            <div><b data-i18n="shell.title"></b><p class="hint" data-i18n="shell.hint"></p></div>
-            <input type="checkbox" id="shellToggle"><span class="switch"></span>
-          </label>
-          <h3 class="section" data-i18n="data.title"></h3>
-          <p class="hint" data-i18n="data.hint"></p>
-          <div class="actions">
-            <button type="button" id="exportBtn" data-i18n="data.export"></button>
-            <button type="button" id="importBtn" data-i18n="data.import"></button>
+      <nav class="settings-nav">
+        <button type="button" data-pane="general"><span class="tile gray" data-icon="gear"></span><span data-i18n="settings.general"></span></button>
+        <button type="button" data-pane="appearance"><span class="tile blue" data-icon="appearance"></span><span data-i18n="settings.appearance"></span></button>
+        <button type="button" data-pane="extensions"><span class="tile green" data-icon="extensions"></span><span data-i18n="extensions.title"></span></button>
+        <button type="button" data-pane="library"><span class="tile orange" data-icon="library"></span><span data-i18n="settings.library"></span></button>
+      </nav>
+      <div class="settings-body" tabindex="-1" autofocus>
+        <section class="pane" data-pane="general">
+          <h2 data-i18n="settings.general"></h2>
+          <div class="set-group">
+            <div class="set-row"><span data-i18n="settings.language"></span><div id="languagePicker" class="segmented"></div></div>
+          </div>
+          <div class="set-group">
+            <label class="set-row">
+              <div><span data-i18n="shell.title"></span><p class="hint" data-i18n="shell.hint"></p></div>
+              <input type="checkbox" id="shellToggle"><span class="switch"></span>
+            </label>
           </div>
         </section>
+        <section class="pane" data-pane="appearance">
+          <h2 data-i18n="settings.appearance"></h2>
+          <div class="set-group">
+            <div class="set-row"><span data-i18n="settings.theme"></span><div id="themePicker" class="segmented"></div></div>
+            <div class="set-row"><span data-i18n="settings.accent"></span><div id="accentPicker" class="swatches"></div></div>
+            <label id="glassRow" class="set-row" hidden>
+              <div><span data-i18n="glass.title"></span><p class="hint" data-i18n="glass.hint"></p></div>
+              <input type="checkbox" id="glassToggle"><span class="switch"></span>
+            </label>
+          </div>
+        </section>
+        <section class="pane" data-pane="extensions">
+          <h2 data-i18n="extensions.title"></h2>
+          <p class="hint lead" data-i18n="extensions.hint"></p>
+          <div id="extList" class="set-group"></div>
+        </section>
+        <section class="pane" data-pane="library">
+          <h2 data-i18n="settings.library"></h2>
+          <p class="hint lead" data-i18n="data.hint"></p>
+          <div class="set-group">
+            <div class="set-row">
+              <span data-i18n="data.backup"></span>
+              <div class="set-actions">
+                <button type="button" id="importBtn" data-i18n="data.import"></button>
+                <button type="button" id="exportBtn" data-i18n="data.export"></button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <menu><button value="ok" class="primary" data-i18n="dialog.done"></button></menu>
       </div>
-      <menu><button value="ok" class="primary" autofocus data-i18n="dialog.done"></button></menu>
     </form>
   </dialog>
 

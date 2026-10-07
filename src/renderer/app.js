@@ -58,6 +58,9 @@ const ICONS = {
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   sort: '<path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/>',
   group: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>',
+  appearance: '<circle cx="12" cy="12" r="8"/><path fill="currentColor" stroke="none" d="M12 4a8 8 0 0 1 0 16z"/>',
+  extensions: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/>',
+  library: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
   gear: '<path d="M19.23 10.41L21.53 10.87L21.53 13.13L19.23 13.59L18.23 15.99L19.54 17.94L17.94 19.54L15.99 18.23L13.59 19.23L13.13 21.53L10.87 21.53L10.41 19.23L8.01 18.23L6.06 19.54L4.46 17.94L5.77 15.99L4.77 13.59L2.47 13.13L2.47 10.87L4.77 10.41L5.77 8.01L4.46 6.06L6.06 4.46L8.01 5.77L10.41 4.77L10.87 2.47L13.13 2.47L13.59 4.77L15.99 5.77L17.94 4.46L19.54 6.06L18.23 8.01Z"/><circle cx="12" cy="12" r="3"/>',
   play: '<path fill="currentColor" stroke="none" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',
   pause: '<rect fill="currentColor" stroke="none" x="6.5" y="5" width="4" height="14" rx="1.2"/><rect fill="currentColor" stroke="none" x="13.5" y="5" width="4" height="14" rx="1.2"/>',
@@ -336,10 +339,10 @@ function openSettings() {
   $('#glassToggle').checked = glassOn()
   call('shellIntegration').then(on => { $('#shellToggle').checked = !!on })
   $('#extList').replaceChildren(...extensions.map(x => {
-    const row = el('label', 'ext-row')
+    const row = el('label', 'set-row')
     const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
     const text = el('div')
-    text.append(el('b', '', x.name), el('p', 'hint', x.description))
+    text.append(el('span', '', x.name), el('p', 'hint', x.description))
     toggle.onchange = () => {
       enabledExtensions[x.id] = toggle.checked
       store.set('ext', enabledExtensions)
@@ -349,7 +352,14 @@ function openSettings() {
     row.append(text, toggle, el('span', 'switch'))
     return row
   }))
+  showSettingsPane(settingsPane)
   $('#settings').showModal()
+}
+
+let settingsPane = 'general'
+function showSettingsPane(name) {
+  settingsPane = name
+  for (const node of $$('#settings [data-pane]')) node.classList.toggle('on', node.dataset.pane === name)
 }
 
 async function exportLibrary() {
@@ -1934,6 +1944,8 @@ function bindEvents() {
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
   $('#settingsBtn').replaceChildren(icon('gear'))
   $('#settingsBtn').onclick = openSettings
+  for (const tile of $$('#settings .tile')) tile.append(icon(tile.dataset.icon))
+  for (const b of $$('.settings-nav button')) b.onclick = () => showSettingsPane(b.dataset.pane)
   $('#shellToggle').onchange = async e => {
     e.target.checked = !!(await call('setShellIntegration', e.target.checked))
   }
