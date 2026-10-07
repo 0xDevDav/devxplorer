@@ -192,6 +192,10 @@ const MESSAGES = {
     'rename.sameFolder': 'To number items, select them in the same folder',
 
     'tab.close': 'Close tab (Ctrl+W)',
+    'nav.back': 'Back (Alt+←)',
+    'nav.forward': 'Forward (Alt+→)',
+    'keys.back': 'Back',
+    'keys.forward': 'Forward',
     'tab.new': 'New tab (Ctrl+T)',
 
     'viewer.openWith': 'Open with default program',
@@ -424,6 +428,10 @@ const MESSAGES = {
     'rename.sameFolder': 'Per numerare seleziona elementi della stessa cartella',
 
     'tab.close': 'Chiudi scheda (Ctrl+W)',
+    'nav.back': 'Indietro (Alt+←)',
+    'nav.forward': 'Avanti (Alt+→)',
+    'keys.back': 'Indietro',
+    'keys.forward': 'Avanti',
     'tab.new': 'Nuova scheda (Ctrl+T)',
 
     'viewer.openWith': 'Apri con il programma predefinito',

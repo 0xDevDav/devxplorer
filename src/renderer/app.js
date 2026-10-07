@@ -50,6 +50,7 @@ const ICONS = {
   folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
+  chevronLeft: '<path d="m15 6-6 6 6 6"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -135,7 +136,8 @@ let pins = store.get('pins', null)
 let tabs = []
 let tabIndex = 0
 const currentTab = () => tabs[tabIndex]
-const saveTabs = () => { store.set('tabs', tabs); store.set('tabIndex', tabIndex) }
+// History (back/forward) belongs to the session; only each tab's folder is remembered.
+const saveTabs = () => { store.set('tabs', tabs.map(({ cwd, focus }) => ({ cwd, focus }))); store.set('tabIndex', tabIndex) }
 
 async function call(name, ...args) {
   try {
@@ -385,7 +387,9 @@ const SHORTCUTS = [
     ['Ctrl+L', 'keys.path'],
     ['↑|↓', 'keys.folders'],
     ['→|key.enter', 'keys.open'],
-    ['←|key.backspace', 'keys.up'],
+    ['←|Alt+↑', 'keys.up'],
+    ['Alt+←|key.backspace', 'keys.back'],
+    ['Alt+→', 'keys.forward'],
     ['A–Z', 'keys.typeSelect'],
   ]],
   ['keys.group.tabs', [
@@ -1835,10 +1839,35 @@ function fitCrumbs() {
 
 /* ========== navigation and tabs ========== */
 
+// Each tab keeps its own back and forward history, like a browser or the Finder.
+const HISTORY_LIMIT = 50
+
 function navigate(dir, focus = null) {
-  Object.assign(currentTab(), { cwd: dir, focus })
+  const tab = currentTab()
+  if (tab.cwd && !samePath(tab.cwd, dir)) {
+    tab.back = [...(tab.back || []), { cwd: tab.cwd, focus: tab.focus }].slice(-HISTORY_LIMIT)
+    tab.forward = []
+  }
+  Object.assign(tab, { cwd: dir, focus })
   saveTabs()
   return showTab()
+}
+
+// step: -1 goes back, 1 goes forward.
+function goHistory(step) {
+  const tab = currentTab()
+  const [from, to] = step < 0 ? ['back', 'forward'] : ['forward', 'back']
+  const entry = tab[from]?.pop()
+  if (!entry) return
+  tab[to] = [...(tab[to] || []), { cwd: tab.cwd, focus: tab.focus }]
+  Object.assign(tab, entry)
+  saveTabs()
+  return showTab()
+}
+
+function renderHistoryButtons() {
+  $('#backBtn').disabled = !currentTab().back?.length
+  $('#forwardBtn').disabled = !currentTab().forward?.length
 }
 
 // Going up keeps the folder we came from focused, so the list does not lose its place.
@@ -1856,6 +1885,7 @@ function showTab() {
   state.anchor = null
   $('#folders').scrollTop = 0
   rememberRecent(tab.cwd)
+  renderHistoryButtons()
   call('watch', tab.cwd)
   return refresh()
 }
@@ -2100,6 +2130,7 @@ function bindEvents() {
       z: undo,
     }[e.key.toLowerCase()]
     if (clipboardKey) { e.preventDefault(); return clipboardKey() }
+    if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); return goHistory(e.key === 'ArrowLeft' ? -1 : 1) }
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c') { e.preventDefault(); return copyPaths(selectedInOrder()) }
     if (e.key === ' ') {
       e.preventDefault()
@@ -2120,7 +2151,8 @@ function bindEvents() {
     const fileSelected = selected.length === 1 && $$('#content .item.sel:not(.folder)').length === 1
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); moveFocus(e.key === 'ArrowDown' ? 1 : -1) }
     else if (e.key === 'ArrowRight') enterFocus()
-    else if (e.key === 'ArrowLeft' || e.key === 'Backspace') goUp()
+    else if (e.key === 'ArrowLeft' || (e.altKey && e.key === 'ArrowUp')) goUp()
+    else if (e.key === 'Backspace') goHistory(-1)
     else if (e.key === 'Enter') {
       if (fileSelected) $('#content .item.sel')?.open()
       else enterFocus()
@@ -2140,6 +2172,12 @@ function bindEvents() {
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
   $('#settingsBtn').replaceChildren(icon('gear'))
   $('#settingsBtn').onclick = openSettings
+  $('#backBtn').replaceChildren(icon('chevronLeft'))
+  $('#forwardBtn').replaceChildren(icon('chevron'))
+  $('#backBtn').onclick = () => goHistory(-1)
+  $('#forwardBtn').onclick = () => goHistory(1)
+  // The mouse's side buttons go back and forward.
+  window.addEventListener('mouseup', e => { if (e.button === 3 || e.button === 4) { e.preventDefault(); goHistory(e.button === 3 ? -1 : 1) } })
   for (const tile of $$('#settings .tile')) tile.append(icon(tile.dataset.icon))
   for (const b of $$('.settings-nav button')) b.onclick = () => showSettingsPane(b.dataset.pane)
   $('#shellToggle').onchange = async e => {

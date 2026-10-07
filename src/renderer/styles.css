@@ -212,6 +212,11 @@ button:disabled { opacity: .5; cursor: default }
 .popup:hover { border-color: var(--line-strong) }
 .popup .icon { width: 12px; height: 12px; color: var(--muted) }
 .popup .lead { display: none; width: 15px; height: 15px; color: var(--text-soft) }
+.history { display: flex; gap: 2px; margin-right: -4px }
+.history button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: var(--text-soft); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer }
+.history button:hover:not(:disabled) { background: var(--hover-strong) }
+.history button:disabled { color: var(--faint); opacity: 1 }
+.history .icon { width: 18px; height: 18px }
 #settingsBtn { display: grid; place-items: center; width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: var(--r-md); color: var(--muted); font-size: 16px; cursor: pointer }
 #settingsBtn:hover { background: var(--panel2); border-color: var(--line); color: var(--text) }
 
