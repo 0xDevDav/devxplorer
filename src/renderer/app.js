@@ -1669,6 +1669,7 @@ function bindEvents() {
   document.addEventListener('pointerover', e => { pointerSection = sectionOf(e.target) })
   bindViewerZoom()
   bindPalette()
+  bindSplitter()
   document.addEventListener('wheel', e => {
     if (!e.ctrlKey || viewerOpen()) return
     e.preventDefault()
@@ -1698,6 +1699,41 @@ const zoomValue = z => Number(localStorage[z.key]) || z.fallback
 
 function applySizes() {
   for (const z of Object.values(ZOOM)) document.body.style.setProperty(z.cssVar, zoomValue(z) + 'px')
+  const width = Number(localStorage.foldersWidth)
+  if (width) document.body.style.setProperty('--folders-width', width + 'px')
+  else document.body.style.removeProperty('--folders-width')
+}
+
+/* Splitter between the folder list and the content: drag to resize, double click for automatic width. */
+const FOLDERS_MIN = 200
+const CONTENT_MIN = 320
+
+function bindSplitter() {
+  const splitter = $('#splitter')
+  const folders = $('#folders')
+  splitter.addEventListener('pointerdown', e => {
+    e.preventDefault()
+    const left = folders.getBoundingClientRect().left
+    const max = $('#main').getBoundingClientRect().width - CONTENT_MIN
+    folders.classList.add('resizing')
+    splitter.classList.add('active')
+    const move = ev => {
+      localStorage.foldersWidth = Math.round(Math.min(max, Math.max(FOLDERS_MIN, ev.clientX - left)))
+      applySizes()
+    }
+    const up = () => {
+      folders.classList.remove('resizing')
+      splitter.classList.remove('active')
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  })
+  splitter.addEventListener('dblclick', () => {
+    delete localStorage.foldersWidth
+    applySizes()
+  })
 }
 
 function resizeSection(section, step) {
