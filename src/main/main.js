@@ -11,6 +11,7 @@ const recycle = require('./recycle')
 const shellIntegration = require('./shell-integration')
 const { powershell, zip, unzip } = require('./powershell')
 const { validName, uniquePath } = require('./paths')
+const fileOps = require('./fileops')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
@@ -50,7 +51,6 @@ function writeJson(file, value) {
 }
 
 const lower = p => p.toLowerCase()
-const isUnder = (p, dir) => lower(p) === lower(dir) || lower(p).startsWith(lower(dir).replace(/\\$/, '') + path.sep)
 
 function checkName(name) {
   if (!validName(name)) throw new Error(t('error.invalidName', { name }))
@@ -98,17 +98,6 @@ let watcher = null
 let watchTimer = null
 
 // Rename when possible; across drives fall back to copy and delete.
-async function moveItem(from, to) {
-  try {
-    await fsp.rename(from, to)
-  } catch (e) {
-    if (e.code !== 'EXDEV') throw e
-    await fsp.cp(from, to, { recursive: true })
-    await fsp.rm(from, { recursive: true })
-  }
-  library.relocate(from, to)
-}
-
 const FOLDER_SIZE_TTL = 60000
 const folderSizes = new Map()
 
@@ -122,6 +111,8 @@ async function walkSize(dir) {
   }))
   return sizes.reduce((sum, size) => sum + size, 0)
 }
+
+const ops = fileOps({ t: (...args) => t(...args), relocate: (from, to) => library.relocate(from, to) })
 
 const libraryFilter = () => [{ name: t('library.fileType'), extensions: ['db'] }]
 
@@ -364,73 +355,23 @@ const handlers = {
     return dest
   },
 
-  // Returns [[from, to]] for every item actually moved, so the move can be undone.
-  async move(paths, dest) {
-    const moved = []
-    for (const p of paths) {
-      if (lower(path.dirname(p)) === lower(dest) || isUnder(dest, p)) continue
-      const to = uniquePath(path.join(dest, path.basename(p)))
-      await moveItem(p, to)
-      moved.push([p, to])
-    }
-    return moved
-  },
-
-  // Moves each item to an exact path; used to undo moves. Never overwrites.
-  async moveTo(pairs) {
-    for (const [from, to] of pairs) {
-      if (fs.existsSync(to)) throw new Error(t('error.exists', { name: path.basename(to) }))
-      await moveItem(from, to)
-    }
-  },
-
-  // Copies next to the destination's existing items ("name (2)" on clashes); returns [[from, to]].
-  async copy(paths, dest) {
-    const copied = []
-    for (const p of paths) {
-      if (isUnder(dest, p) && lower(path.dirname(p)) !== lower(dest)) continue
-      const to = uniquePath(path.join(dest, path.basename(p)))
-      await fsp.cp(p, to, { recursive: true, errorOnExist: true, force: false })
-      copied.push([p, to])
-    }
-    return copied
-  },
+  // Batches return { done: [[from, to]], error }, so a partly completed batch can still be undone.
+  move: (paths, dest) => ops.move(paths, dest),
+  moveTo: pairs => ops.moveTo(pairs),
+  copy: (paths, dest) => ops.copy(paths, dest),
 
   restore: paths => recycle.restore(paths),
 
-  /*
-   * pairs: [[path, newName]]. Renames go through temporary names first so that swaps and
-   * renumbering within the same folder never collide; on failure the first phase is rolled back.
-   */
-  async renameMany(pairs) {
-    const sources = new Set(pairs.map(([p]) => lower(p)))
-    const targets = pairs.map(([p, name]) => { checkName(name); return path.join(path.dirname(p), name) })
-    if (new Set(targets.map(lower)).size !== targets.length) throw new Error(t('error.duplicateNames'))
-    for (const target of targets) {
-      if (fs.existsSync(target) && !sources.has(lower(target))) throw new Error(t('error.exists', { name: path.basename(target) }))
-    }
-    const staged = []
-    try {
-      for (const [i, [p]] of pairs.entries()) {
-        const tmp = path.join(path.dirname(p), `.~ren${Date.now()}_${i}`)
-        await fsp.rename(p, tmp)
-        staged.push([tmp, p])
-      }
-    } catch (e) {
-      for (const [tmp, p] of staged) await fsp.rename(tmp, p).catch(() => {})
-      throw e
-    }
-    for (const [i, [tmp, p]] of staged.entries()) {
-      await fsp.rename(tmp, targets[i])
-      library.relocate(p, targets[i])
-    }
-    return true
-  },
+  renameMany: pairs => ops.renameMany(pairs),
 
   // Annotations are kept: a file restored from the Recycle Bin gets its status back.
   async trash(paths) {
-    for (const p of paths) await shell.trashItem(p)
-    return true
+    const done = []
+    for (const p of paths) {
+      try { await shell.trashItem(p) } catch (e) { return { done, error: e.message } }
+      done.push(p)
+    }
+    return { done }
   },
 
   async mkdir(dir, name) {

@@ -990,6 +990,7 @@ function dropTarget(node, dir) {
 /* ========== undoable operations ========== */
 
 // Every change to files goes through these helpers, which record how to revert it for Ctrl+Z.
+// A revert resolves to a truthy value when it fully succeeded.
 const undoStack = []
 const UNDO_LIMIT = 50
 
@@ -1001,20 +1002,30 @@ function pushUndo(action, revert) {
 async function undo() {
   const op = undoStack.pop()
   if (!op) return toast(t('undo.nothing'), 'info')
-  await op.revert()
-  toast(t('undo.done', { action: t(op.action) }), 'info')
+  if (await op.revert()) toast(t('undo.done', { action: t(op.action) }), 'info')
   refresh()
 }
 
+/*
+ * File batches resolve to { done, error }: when an item fails halfway, the error is shown and
+ * the items already processed can still be undone. Returns the processed items.
+ */
+async function runBatch(name, ...args) {
+  const result = await call(name, ...args)
+  if (result?.error) toast(result.error)
+  return result?.done || []
+}
+const batchSucceeded = async promise => { const r = await promise; return !!r && !r.error }
+
 async function moveItems(paths, dir) {
-  const moved = (await call('move', paths, dir)) || []
-  if (moved.length) pushUndo('action.move', () => call('moveTo', moved.map(([from, to]) => [to, from])))
+  const moved = await runBatch('move', paths, dir)
+  if (moved.length) pushUndo('action.move', () => batchSucceeded(call('moveTo', moved.map(([from, to]) => [to, from]))))
   return moved
 }
 
 async function copyItems(paths, dir) {
-  const copied = (await call('copy', paths, dir)) || []
-  if (copied.length) pushUndo('action.copy', () => call('trash', copied.map(([, to]) => to)))
+  const copied = await runBatch('copy', paths, dir)
+  if (copied.length) pushUndo('action.copy', () => batchSucceeded(call('trash', copied.map(([, to]) => to))))
   return copied
 }
 
@@ -1025,8 +1036,8 @@ async function renameItems(pairs) {
 }
 
 async function trashItems(paths) {
-  if (!(await call('trash', paths))) return
-  pushUndo('action.trash', () => call('restore', paths))
+  const trashed = await runBatch('trash', paths)
+  if (trashed.length) pushUndo('action.trash', async () => (await call('restore', trashed))?.length)
 }
 
 /* ========== clipboard (within the app) ========== */
@@ -1123,7 +1134,7 @@ async function newFolder() {
   const name = await ask(t('folder.newPrompt'), t('folder.newDefault'))
   if (!name) return
   const created = await call('mkdir', state.cwd, name.trim())
-  if (created) pushUndo('action.newFolder', () => call('trash', [created]))
+  if (created) pushUndo('action.newFolder', () => batchSucceeded(call('trash', [created])))
   refresh()
 }
 
