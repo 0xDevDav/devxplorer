@@ -406,7 +406,11 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   word-break: break-all;
   box-shadow: inset 0 0 0 1px #0000000d;
 }
-.paper:not(.instant) { animation: fade-in var(--normal) ease-out }
+.app-icon { display: grid; place-items: center; width: 100%; height: 100%; background: var(--panel2) }
+.app-icon img { position: relative; width: 48px; height: 48px; filter: drop-shadow(0 2px 4px #0004) }
+.app-icon.shortcut { position: relative }
+.app-icon.shortcut::after { position: absolute; left: calc(50% - 26px); top: calc(50% + 10px); width: 16px; height: 16px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 11 11 5M6.5 5H11v4.5' fill='none' stroke='%23111' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat; border-radius: 4px; box-shadow: 0 1px 3px #0006; content: '' }
+.app-icon:not(.instant), .paper:not(.instant) { animation: fade-in var(--normal) ease-out }
 
 .thumb .play { position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px; padding: 7px 6px 7px 8px; border-radius: 50%; color: #fff; background: #0009; backdrop-filter: blur(6px) }
 /* hover playback inside the card */
@@ -484,7 +488,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 #viewer.show { opacity: 1; visibility: visible; transition-delay: 0s }
 #viewer.show > :first-child { animation: zoom-in .24s var(--ease) }
 #viewer > img, #viewer > video { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: 8px }
-#viewer .doc { width: min(1100px, 100%); height: 100%; background: #fff; border: 0; border-radius: 8px }
+#viewer iframe.doc { width: min(1100px, 100%); height: 100%; background: #fff; border: 0; border-radius: 8px }
 #viewer .other { display: flex; flex-direction: column; align-items: center; gap: 14px }
 #viewer .other .name { font-size: 15px; color: var(--text) }
 #viewer .other button { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
@@ -601,7 +605,20 @@ table.csv thead .rownum { z-index: 2; background: var(--panel2) }
 
 #viewer iframe.page { display: block; width: 100%; height: 100%; border: 0; background: #fff }
 .audioview { display: flex; flex-direction: column; align-items: center; gap: 24px }
-.audioview audio { width: min(460px, 80vw) }
+
+.media-controls { display: flex; align-items: center; gap: 10px; width: min(520px, 80vw); height: 40px; padding: 0 14px 0 6px; color: #f2f2f5; font-size: 12px; font-variant-numeric: tabular-nums; background: #1e1e24c0; backdrop-filter: blur(20px) saturate(1.6); border: 1px solid #ffffff1a; border-radius: 999px; box-shadow: 0 8px 28px #0007; transition: opacity var(--normal) var(--ease) }
+.media-controls.overlay { position: absolute; left: 50%; bottom: 28px; z-index: 2; transform: translateX(-50%) }
+.media-controls.idle { opacity: 0; pointer-events: none }
+.media-controls button { display: grid; place-items: center; width: 30px; height: 30px; padding: 6px; color: inherit; background: none; border: 0; border-radius: 50%; cursor: pointer }
+.media-controls button:hover { background: #ffffff1c }
+.media-controls .mc-time { min-width: 34px; text-align: center; color: #c8c8d0 }
+.mc-track { position: relative; flex: 1; height: 16px; cursor: pointer; touch-action: none }
+.mc-track::before, .mc-fill { position: absolute; left: 0; top: 50%; height: 4px; border-radius: 2px; transform: translateY(-50%); content: '' }
+.mc-track::before { right: 0; background: #ffffff33 }
+.mc-fill { background: #fff }
+.mc-knob { position: absolute; top: 50%; width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px #0008; transform: translate(-50%, -50%) scale(0); transition: transform var(--fast) var(--ease) }
+.mc-track:hover .mc-knob, .mc-track:active .mc-knob { transform: translate(-50%, -50%) scale(1) }
+#viewer.controls-idle, #viewer.controls-idle * { cursor: none }
 
 /* 3D model viewer */
 .mesh-view { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 10px; background: radial-gradient(ellipse at 50% 35%, #2c2c3a, #0d0d10 75%) }

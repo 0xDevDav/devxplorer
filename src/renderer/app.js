@@ -60,6 +60,9 @@ const ICONS = {
   group: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>',
   gear: '<path d="M19.23 10.41L21.53 10.87L21.53 13.13L19.23 13.59L18.23 15.99L19.54 17.94L17.94 19.54L15.99 18.23L13.59 19.23L13.13 21.53L10.87 21.53L10.41 19.23L8.01 18.23L6.06 19.54L4.46 17.94L5.77 15.99L4.77 13.59L2.47 13.13L2.47 10.87L4.77 10.41L5.77 8.01L4.46 6.06L6.06 4.46L8.01 5.77L10.41 4.77L10.87 2.47L13.13 2.47L13.59 4.77L15.99 5.77L17.94 4.46L19.54 6.06L18.23 8.01Z"/><circle cx="12" cy="12" r="3"/>',
   play: '<path fill="currentColor" stroke="none" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',
+  pause: '<rect fill="currentColor" stroke="none" x="6.5" y="5" width="4" height="14" rx="1.2"/><rect fill="currentColor" stroke="none" x="13.5" y="5" width="4" height="14" rx="1.2"/>',
+  speaker: '<path fill="currentColor" stroke="none" d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/>',
+  speakerOff: '<path fill="currentColor" stroke="none" d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>',
   // two-tone filled folder in the style of the Finder
   folderFill: '<path fill="currentColor" stroke="none" opacity=".6" d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.4l2 2h8.6A2.5 2.5 0 0 1 22 8.5V10H2z"/><path fill="currentColor" stroke="none" d="M2 9h20v9.5a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>',
 }
@@ -84,9 +87,12 @@ const DOC_KINDS = [
   ['app', /^(exe|msi|bat|cmd|ps1|lnk|url|appx|msix)$/],
 ]
 
+const docKind = name => DOC_KINDS.find(([, test]) => test.test(extensionOf(name)))?.[0] || 'other'
+const SHORTCUT_EXT = /\.(lnk|url)$/i
+
 function docIcon(name, cls = '') {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
-  const kind = DOC_KINDS.find(([, test]) => test.test(ext))?.[0] || 'other'
+  const ext = extensionOf(name)
+  const kind = docKind(name)
   const node = el('div', `doc doc-${kind} ${cls}`.trim())
   const page = el('div', 'page')
   page.append(el('span', '', (ext || 'file').slice(0, 4).toUpperCase()))
@@ -360,9 +366,11 @@ async function importLibrary() {
 
 /* ========== previews ========== */
 
-// Images and videos use shell thumbnails; other files show their text or a document icon.
+// Images and videos use shell thumbnails, programs and shortcuts their own icon; other files show
+// their text or a document icon.
 async function loadPreview(path, type) {
   if (type !== 'file') return { img: await call('thumb', path) }
+  if (docKind(baseName(path)) === 'app') return { icon: await call('appIcon', path) }
   if (MESH_EXT.test(path)) return { img: await meshThumbnail(path) }
   const text = await call('readText', path)
   return text != null ? { text } : {}
@@ -381,11 +389,19 @@ const previewObserver = new IntersectionObserver(entries => entries.forEach(asyn
   const preview = await previews.get(key)
   loadedPreviews.add(key)
   let node = img
-  if (preview.text != null) img.replaceWith(node = el('div', 'paper', preview.text.slice(0, 600)))
+  if (preview.icon) img.replaceWith(node = appIcon(img.dataset.src, preview.icon))
+  else if (preview.text != null) img.replaceWith(node = el('div', 'paper', preview.text.slice(0, 600)))
   else if (preview.img) img.src = preview.img
   else img.replaceWith(node = docIcon(baseName(img.dataset.src)))
   if (instant) node.classList.add('instant')
 }))
+
+// Shortcuts carry the arrow badge Windows draws on them.
+function appIcon(path, src) {
+  const node = el('div', 'app-icon' + (SHORTCUT_EXT.test(path) ? ' shortcut' : ''))
+  node.append(Object.assign(el('img'), { src, draggable: false }))
+  return node
+}
 
 function previewImg(item) {
   const img = el('img')
@@ -1104,7 +1120,8 @@ function closeViewer() {
   const box = $('#viewer')
   box.classList.remove('show')
   call('setViewerOpen', false)
-  box.querySelector('video')?.pause()
+  box.querySelector('video, audio')?.pause()
+  viewerItemAbort?.abort()
   disposeMeshView()
   syncWindowControls()
   // Content is dropped only after the fade-out, unless the viewer was reopened meanwhile.
@@ -1152,15 +1169,24 @@ function otherView(file) {
   return view
 }
 
+// Listeners that live as long as the current viewer item; aborted when it changes or closes.
+let viewerItemAbort = null
+function viewerSignal() {
+  viewerItemAbort?.abort()
+  viewerItemAbort = new AbortController()
+  return viewerItemAbort.signal
+}
+
 function showViewer() {
   disposeMeshView()
+  viewerItemAbort?.abort()
   const box = $('#viewer')
   const file = viewer.items[viewer.index]
   const isCurrent = () => viewer.items[viewer.index] === file
   let media
 
   if (file.type === 'video') {
-    media = Object.assign(el('video'), { src: fileUrl(file.path), controls: true, autoplay: true })
+    media = Object.assign(el('video'), { src: fileUrl(file.path), autoplay: true })
   } else if (file.type === 'img') {
     media = el('img')
     // Chromium cannot decode HEIC; the Windows shell renders a full-size image for it.
@@ -1195,6 +1221,7 @@ function showViewer() {
   const bar = el('div', 'viewer-bar')
   bar.append(el('span', 'viewer-title', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
+  if (file.type === 'video') box.append(mediaControls(media, { overlay: true, signal: viewerSignal() }))
   if (transparent) box.append(matteSwitch())
   if (infoOpen()) box.append(infoPanel(file, media))
   applyMatte()

@@ -261,7 +261,8 @@ async function richPreview(file) {
   const ext = extensionOf(file.name)
   if (AUDIO_EXT.test(ext)) {
     const node = el('div', 'audioview')
-    node.append(docIcon(file.name, 'large'), Object.assign(el('audio'), { src: fileUrl(file.path), controls: true, autoplay: true }))
+    const audio = Object.assign(el('audio'), { src: fileUrl(file.path), autoplay: true })
+    node.append(docIcon(file.name, 'large'), audio, mediaControls(audio))
     return { node, bare: true }
   }
   if (ext === 'svg') return { node: Object.assign(el('img'), { src: fileUrl(file.path) }), bare: true }

@@ -190,6 +190,17 @@ const handlers = {
     } catch { return null }
   },
 
+  // Icon of a program or shortcut, as Windows shows it; a .lnk shows the icon of its target.
+  // ponytail: getFileIcon stops at 48px on Windows; jumbo 256px icons need the shell image list (native code).
+  async appIcon(p) {
+    let target = p
+    if (/\.lnk$/i.test(p)) try { target = shell.readShortcutLink(p).target || p } catch {}
+    try {
+      const img = await app.getFileIcon(target, { size: 'large' })
+      return img.isEmpty() ? null : img.toDataURL()
+    } catch { return null }
+  },
+
   // Whole file as bytes, or null when it is larger than max (used for 3D models).
   async readBinary(p, max) {
     const stat = await fsp.stat(p).catch(() => null)
