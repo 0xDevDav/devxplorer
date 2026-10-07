@@ -385,6 +385,7 @@ function openSettings() {
   $('#glassRow').hidden = !state.supportsGlass
   $('#glassToggle').checked = glassOn()
   call('shellIntegration').then(on => { $('#shellToggle').checked = !!on })
+  call('defaultFileManager').then(on => { $('#defaultToggle').checked = !!on })
   $('#extList').replaceChildren(...extensions.map(x => {
     const row = el('label', 'set-row')
     const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
@@ -1998,7 +1999,7 @@ function placeButton(dir, name, kind) {
   b.oncontextmenu = e => showMenu(e, [
     { label: t('menu.openNewTab'), run: () => newTab(dir) },
     { label: t('menu.openNewWindow'), run: () => call('newWindow', dir) },
-    { label: t('menu.openInExplorer'), run: () => call('open', dir) },
+    { label: t('menu.openInExplorer'), run: () => call('openInExplorer', dir) },
     { label: t('menu.terminal'), run: () => call('openTerminal', dir) },
     { label: t('menu.copyPath'), run: () => copyPaths([dir]) },
     { label: isPinned(dir) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(dir) },
@@ -2445,7 +2446,7 @@ function bindEvents() {
     '-',
     { label: t('menu.terminal'), run: () => call('openTerminal', state.cwd) },
     hasVsCode && { label: t('menu.vscode'), run: () => call('openInVsCode', [state.cwd]) },
-    { label: t('menu.openInExplorer'), run: () => call('open', state.cwd) },
+    { label: t('menu.openInExplorer'), run: () => call('openInExplorer', state.cwd) },
     { label: t('menu.copyPath'), run: () => copyPaths([state.cwd]) },
     { label: isPinned(state.cwd) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(state.cwd) },
     '-',
@@ -2551,6 +2552,12 @@ function bindEvents() {
   for (const b of $$('.settings-nav button')) b.onclick = () => showSettingsPane(b.dataset.pane)
   $('#shellToggle').onchange = async e => {
     e.target.checked = !!(await call('setShellIntegration', e.target.checked))
+    // Without the menu entry DevXplorer cannot be the default either.
+    if (!e.target.checked) $('#defaultToggle').checked = false
+  }
+  $('#defaultToggle').onchange = async e => {
+    e.target.checked = !!(await call('setDefaultFileManager', e.target.checked))
+    if (e.target.checked) $('#shellToggle').checked = true
   }
   $('#glassToggle').onchange = e => {
     localStorage.glass = e.target.checked
@@ -2808,15 +2815,28 @@ function openSetup(step = 0) {
     page.append(group)
   } else if (name === 'integration') {
     heading('setup.integration.title', 'setup.integration.text')
-    const row = el('label', 'set-row')
-    const toggle = Object.assign(el('input'), { type: 'checkbox' })
-    const text = el('div')
-    text.append(el('span', '', t('shell.title')), el('p', 'hint', t('shell.hint')))
-    call('shellIntegration').then(on => { toggle.checked = !!on })
-    toggle.onchange = async () => { toggle.checked = !!(await call('setShellIntegration', toggle.checked)) }
-    row.append(text, toggle, el('span', 'switch'))
+    const switchRow = (title, hint) => {
+      const row = el('label', 'set-row')
+      const toggle = Object.assign(el('input'), { type: 'checkbox' })
+      const text = el('div')
+      text.append(el('span', '', t(title)), el('p', 'hint', t(hint)))
+      row.append(text, toggle, el('span', 'switch'))
+      return [row, toggle]
+    }
+    const [menuRow, menuToggle] = switchRow('shell.title', 'shell.hint')
+    const [defaultRow, defaultToggle] = switchRow('default.title', 'default.hint')
+    call('shellIntegration').then(on => { menuToggle.checked = !!on })
+    call('defaultFileManager').then(on => { defaultToggle.checked = !!on })
+    menuToggle.onchange = async () => {
+      menuToggle.checked = !!(await call('setShellIntegration', menuToggle.checked))
+      if (!menuToggle.checked) defaultToggle.checked = false
+    }
+    defaultToggle.onchange = async () => {
+      defaultToggle.checked = !!(await call('setDefaultFileManager', defaultToggle.checked))
+      if (defaultToggle.checked) menuToggle.checked = true
+    }
     const group = el('div', 'set-group')
-    group.append(row)
+    group.append(menuRow, defaultRow)
     page.append(group)
   } else {
     page.append(Object.assign(el('img', 'setup-icon'), { src: '../../assets/icon.png', alt: '' }))

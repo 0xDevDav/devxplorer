@@ -411,6 +411,13 @@ const handlers = {
   },
 
   shellIntegration: () => shellIntegration.isEnabled(),
+  defaultFileManager: () => shellIntegration.isDefault(),
+
+  async setDefaultFileManager(enabled) {
+    if (enabled) await shellIntegration.setDefault(t('shell.openIn'), launchCommand())
+    else await shellIntegration.unsetDefault()
+    return shellIntegration.isDefault()
+  },
 
   async setShellIntegration(enabled) {
     if (enabled) await shellIntegration.enable(t('shell.openIn'), launchCommand())
@@ -423,7 +430,10 @@ const handlers = {
       currentLanguage = language
       t = translator(language)
       // keep the File Explorer entry in the app language
-      shellIntegration.isEnabled().then(on => on && shellIntegration.enable(t('shell.openIn'), launchCommand()))
+      shellIntegration.isDefault().then(async isDefault => {
+        if (isDefault) await shellIntegration.setDefault(t('shell.openIn'), launchCommand())
+        else if (await shellIntegration.isEnabled()) await shellIntegration.enable(t('shell.openIn'), launchCommand())
+      }).catch(error => log.error('shell integration:', error))
     }
     appearance = { theme, glass: SUPPORTS_MICA && glass }
     nativeTheme.themeSource = theme
@@ -438,6 +448,8 @@ const handlers = {
   newWindow(dir) { createWindow(dir, this) },
 
   open: p => shell.openPath(p),
+  // Always File Explorer, even when DevXplorer is the default for folders.
+  openInExplorer: dir => launch('explorer.exe', [dir]),
   reveal: p => shell.showItemInFolder(p),
 
   // The Windows "Open with" chooser.
