@@ -6,7 +6,7 @@ const os = require('os')
 const path = require('path')
 const library = require('../src/main/library')
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'explorer-test-'))
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'devxplorer-test-'))
 const at = (...parts) => path.join(root, ...parts)
 const write = (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data) }
 const metaOf = async p => library.metaFor(p, fs.statSync(p))

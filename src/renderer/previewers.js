@@ -158,7 +158,7 @@ function csvTable(text, ext, truncated) {
   const wrap = el('div', 'tablewrap')
   wrap.append(table)
   const limited = truncated || rows.length > PREVIEW_ROW_LIMIT
-  const caption = `${body.length} righe · ${width} colonne` + (limited ? ' · anteprima parziale' : '')
+  const caption = t('preview.size', { rows: body.length, cols: width }) + (limited ? ' · ' + t('preview.partial') : '')
   return { node: wrap, caption }
 }
 
@@ -209,7 +209,7 @@ function renderMarkdown(text) {
       const items = [line.replace(LIST, '')]
       while (LIST.test(lines[i + 1] || '')) items.push(lines[++i].replace(LIST, ''))
       const tag = ordered ? 'ol' : 'ul'
-      out.push(`<${tag}>${items.map(t => `<li>${markdownInline(t)}</li>`).join('')}</${tag}>`)
+      out.push(`<${tag}>${items.map(item => `<li>${markdownInline(item)}</li>`).join('')}</${tag}>`)
     } else if (!line.trim()) {
       flush()
     } else {
@@ -257,7 +257,7 @@ async function richPreview(file) {
   return { node: codeView(text, ext) }
 }
 
-// Wraps a preview with an optional "Anteprima / Sorgente" switch and a caption.
+// Wraps a preview with an optional rendered/source switch and a caption.
 function richPreviewFrame({ node, source, caption }) {
   const frame = el('div', 'rich')
   const body = el('div', 'rich-body')
@@ -265,7 +265,7 @@ function richPreviewFrame({ node, source, caption }) {
   if (source) {
     const switcher = el('div', 'segmented rich-switch')
     let sourceNode = null
-    const options = [['Anteprima', () => node], ['Sorgente', () => (sourceNode ??= source())]]
+    const options = [[t('preview.rendered'), () => node], [t('preview.source'), () => (sourceNode ??= source())]]
     options.forEach(([label, view], i) => {
       const b = el('button', i === 0 ? 'on' : '', label)
       b.onclick = () => {

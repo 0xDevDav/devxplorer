@@ -4,6 +4,7 @@ const os = require('os')
 const fsp = fs.promises
 const path = require('path')
 const library = require('./library')
+const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
 const WINDOW_FILE = path.join(DATA_DIR, 'window.json')
@@ -14,7 +15,6 @@ const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic)$/i
 const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v)$/i
 const HIDDEN = /^(\$|\.)|^(desktop\.ini|thumbs\.db|system volume information|config\.msi|recovery|pagefile\.sys|hiberfil\.sys|swapfile\.sys|dumpstack\.log(\.tmp)?)$/i
 const INVALID_NAME = /[<>:"/\\|?*]|[. ]$/
-const LIBRARY_FILTER = [{ name: 'Libreria Explorer', extensions: ['db'] }]
 const TRANSPARENT = '#00000000'
 // The Mica material needs Windows 11 22H2 (build 22621) or later.
 const SUPPORTS_MICA = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621
@@ -34,7 +34,7 @@ const lower = p => p.toLowerCase()
 const isUnder = (p, dir) => lower(p) === lower(dir) || lower(p).startsWith(lower(dir).replace(/\\$/, '') + path.sep)
 
 function checkName(name) {
-  if (!name || INVALID_NAME.test(name)) throw new Error(`Nome non valido: ${name}`)
+  if (!name || INVALID_NAME.test(name)) throw new Error(t('error.invalidName', { name }))
 }
 
 async function uniquePath(p) {
@@ -60,16 +60,19 @@ async function describe(p) {
 
 let win = null
 let chrome = null
+// Error messages and dialogs follow the language the renderer reports (system locale until then).
+let t = translator('en')
 let appearance = null
 let watcher = null
 let watchTimer = null
+
+const libraryFilter = () => [{ name: t('library.fileType'), extensions: ['db'] }]
 
 const handlers = {
   init: () => ({
     supportsGlass: SUPPORTS_MICA,
     start: startFolder(),
-    places: [['Desktop', 'desktop'], ['Immagini', 'pictures'], ['Video', 'videos'], ['Documenti', 'documents'], ['Download', 'downloads']]
-      .map(([name, key]) => ({ name, path: app.getPath(key), kind: key })),
+    places: ['desktop', 'pictures', 'videos', 'documents', 'downloads'].map(kind => ({ path: app.getPath(kind), kind })),
     drives: [...'CDEFGHIJKLMNOPQRSTUVWXYZ'].map(c => c + ':\\').filter(d => fs.existsSync(d)),
   }),
 
@@ -101,13 +104,13 @@ const handlers = {
   },
 
   async exportLibrary() {
-    const r = await dialog.showSaveDialog(win, { defaultPath: 'explorer-libreria.db', filters: LIBRARY_FILTER })
+    const r = await dialog.showSaveDialog(win, { defaultPath: t('library.defaultName'), filters: libraryFilter() })
     if (r.canceled) return null
     return library.exportTo(r.filePath)
   },
 
   async importLibrary() {
-    const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: LIBRARY_FILTER })
+    const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: libraryFilter() })
     if (r.canceled) return null
     return library.importFrom(r.filePaths[0])
   },
@@ -142,7 +145,8 @@ const handlers = {
   },
 
   // Keeps system-drawn surfaces (Mica, native dialogs) in the app's theme and toggles the glass material.
-  appearance({ theme, glass }) {
+  appearance({ theme, glass, language }) {
+    if (language) t = translator(language)
     appearance = { theme, glass: SUPPORTS_MICA && glass }
     nativeTheme.themeSource = theme
     if (!SUPPORTS_MICA) return
@@ -175,9 +179,9 @@ const handlers = {
   async renameMany(pairs) {
     const sources = new Set(pairs.map(([p]) => lower(p)))
     const targets = pairs.map(([p, name]) => { checkName(name); return path.join(path.dirname(p), name) })
-    if (new Set(targets.map(lower)).size !== targets.length) throw new Error('Nomi duplicati')
-    for (const t of targets) {
-      if (fs.existsSync(t) && !sources.has(lower(t))) throw new Error(`Esiste già: ${path.basename(t)}`)
+    if (new Set(targets.map(lower)).size !== targets.length) throw new Error(t('error.duplicateNames'))
+    for (const target of targets) {
+      if (fs.existsSync(target) && !sources.has(lower(target))) throw new Error(t('error.exists', { name: path.basename(target) }))
     }
     const staged = []
     try {
@@ -217,7 +221,7 @@ function startFolder() {
     fs.existsSync(a) && fs.statSync(a).isDirectory())
 }
 
-// Native drag lets files be dropped into other apps (Explorer, browsers) as well as back into this window.
+// Native drag lets files be dropped into other apps (File Explorer, browsers) as well as back into this window.
 const EMPTY_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 ipcMain.on('drag', (e, paths, icon) => {
   const img = icon ? nativeImage.createFromDataURL(icon).resize({ width: 96 }) : nativeImage.createFromDataURL(EMPTY_ICON)
@@ -225,6 +229,7 @@ ipcMain.on('drag', (e, paths, icon) => {
 })
 
 app.whenReady().then(() => {
+  t = translator(pickLanguage(app.getLocale()))
   fs.mkdirSync(DATA_DIR, { recursive: true })
   library.open(path.join(DATA_DIR, 'library.db'))
   Menu.setApplicationMenu(null)

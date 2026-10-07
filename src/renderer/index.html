@@ -1,29 +1,29 @@
 <!doctype html>
-<html lang="it">
+<html>
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; img-src file: data:; media-src file:">
-  <title>Explorer</title>
+  <title>DevXplorer</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header id="titlebar">
-    <div class="brand">Explorer</div>
+    <div class="brand">DevXplorer</div>
     <div id="tabs"></div>
   </header>
 
   <div id="toolbar">
     <nav id="crumbs"></nav>
-    <label class="search"><input id="q" type="search" placeholder="Cerca" spellcheck="false"></label>
-    <button id="sort" class="popup" title="Ordina"></button>
-    <button id="group" class="popup" title="Raggruppa"></button>
-    <button id="settingsBtn" title="Impostazioni" aria-label="Impostazioni"></button>
+    <label class="search"><input id="q" type="search" data-i18n-placeholder="search.placeholder" spellcheck="false"></label>
+    <button id="sort" class="popup" data-i18n-title="sort.title"></button>
+    <button id="group" class="popup" data-i18n-title="group.title"></button>
+    <button id="settingsBtn" data-i18n-title="settings.title"></button>
   </div>
 
   <nav id="places">
-    <div id="favs" class="place-group" aria-label="Preferiti"></div>
+    <div id="favs" class="place-group" data-i18n-title="places.favorites"></div>
     <span class="divider"></span>
-    <div id="drives" class="place-group" aria-label="Questo PC"></div>
+    <div id="drives" class="place-group" data-i18n-title="places.pc"></div>
     <div id="extfilters"></div>
   </nav>
 
@@ -39,34 +39,37 @@
     <form method="dialog">
       <label id="askLabel" for="askInput"></label>
       <input id="askInput" autocomplete="off">
-      <menu><button value="ok" class="primary">OK</button><button value="cancel">Annulla</button></menu>
+      <menu><button value="ok" class="primary" data-i18n="dialog.ok"></button><button value="cancel" data-i18n="dialog.cancel"></button></menu>
     </form>
   </dialog>
 
   <dialog id="settings">
     <form method="dialog">
-      <h3>Aspetto</h3>
+      <h3 data-i18n="settings.appearance"></h3>
       <div id="themePicker" class="segmented"></div>
-      <div id="accentPicker" class="swatches" aria-label="Colore d'accento"></div>
+      <div id="accentPicker" class="swatches"></div>
       <label id="glassRow" class="ext-row glass-row" hidden>
-        <div><b>Effetto vetro</b><p class="hint">Sfondo traslucido di Windows 11 sulle barre in alto.</p></div>
+        <div><b data-i18n="glass.title"></b><p class="hint" data-i18n="glass.hint"></p></div>
         <input type="checkbox" id="glassToggle"><span class="switch"></span>
       </label>
-      <h3 class="section">Estensioni</h3>
-      <p class="hint">Attiva solo quelle che servono al tuo lavoro. Disattivarle non cancella i dati.</p>
+      <h3 class="section" data-i18n="settings.language"></h3>
+      <div id="languagePicker" class="segmented"></div>
+      <h3 class="section" data-i18n="extensions.title"></h3>
+      <p class="hint" data-i18n="extensions.hint"></p>
       <div id="extList"></div>
-      <h3 class="section">Dati</h3>
-      <p class="hint">Stati e tag dei file sono legati al loro contenuto: restano anche se i file vengono spostati o rinominati, e si possono condividere con chi ha gli stessi file.</p>
+      <h3 class="section" data-i18n="data.title"></h3>
+      <p class="hint" data-i18n="data.hint"></p>
       <div class="actions">
-        <button type="button" id="exportBtn">Esporta libreria…</button>
-        <button type="button" id="importBtn">Importa libreria…</button>
+        <button type="button" id="exportBtn" data-i18n="data.export"></button>
+        <button type="button" id="importBtn" data-i18n="data.import"></button>
       </div>
-      <menu><button value="ok" class="primary" autofocus>Fatto</button></menu>
+      <menu><button value="ok" class="primary" autofocus data-i18n="dialog.done"></button></menu>
     </form>
   </dialog>
 
   <div id="toast" hidden></div>
 
+  <script src="../shared/messages.js"></script>
   <script src="app.js"></script>
   <script src="previewers.js"></script>
   <script src="extensions/social.js"></script>

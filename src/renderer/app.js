@@ -11,7 +11,7 @@ function el(tag, cls, text) {
 }
 
 // Windows paths only; drive roots keep their trailing backslash ("C:\").
-const baseName = p => { const t = p.replace(/\\$/, ''); return t.slice(t.lastIndexOf('\\') + 1) }
+const baseName = p => { const trimmed = p.replace(/\\$/, ''); return trimmed.slice(trimmed.lastIndexOf('\\') + 1) }
 const parentDir = p => {
   const head = p.slice(0, p.lastIndexOf('\\', p.length - 2))
   return head.endsWith(':') || !head ? (head || p.slice(0, 2)) + '\\' : head
@@ -20,7 +20,21 @@ const joinPath = (dir, name) => dir.endsWith('\\') ? dir + name : dir + '\\' + n
 const samePath = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase()
 const fileUrl = p => 'file:///' + encodeURI(p.replace(/\\/g, '/')).replace(/#/g, '%23').replace(/\?/g, '%3F')
 
-const collator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' })
+/* ========== language ========== */
+
+// "system" follows the Windows display language; unsupported languages fall back to English.
+const languagePreference = () => localStorage.language || 'system'
+const language = pickLanguage(languagePreference() === 'system' ? navigator.language : languagePreference())
+const t = translator(language)
+document.documentElement.lang = language
+
+function translateStaticText() {
+  for (const node of $$('[data-i18n]')) node.textContent = t(node.dataset.i18n)
+  for (const node of $$('[data-i18n-placeholder]')) node.placeholder = t(node.dataset.i18nPlaceholder)
+  for (const node of $$('[data-i18n-title]')) node.title = node.ariaLabel = t(node.dataset.i18nTitle)
+}
+
+const collator = new Intl.Collator(language, { numeric: true, sensitivity: 'base' })
 const byName = (a, b) => collator.compare(a.name, b.name)
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
 
@@ -127,11 +141,11 @@ async function list(dir) {
 }
 
 function toast(message) {
-  const t = $('#toast')
-  t.textContent = message
-  t.hidden = false
+  const box = $('#toast')
+  box.textContent = message
+  box.hidden = false
   clearTimeout(toast.timer)
-  toast.timer = setTimeout(() => { t.hidden = true }, 4000)
+  toast.timer = setTimeout(() => { box.hidden = true }, 4000)
 }
 
 const sorted = items => items.sort(state.sort === 'date' ? (a, b) => b.mtime - a.mtime : byName)
@@ -157,12 +171,13 @@ const activeExtensions = () => extensions.filter(x => enabledExtensions[x.id] ??
 function chip(on, children, onclick, count) {
   const b = el('button', 'chip' + (on ? ' on' : ''))
   b.append(...children)
-  if (count != null) b.title = `${count} element${count === 1 ? 'o' : 'i'}`
+  if (count != null) b.title = t.n('count.items', count)
   b.onclick = onclick
   return b
 }
 
 const extensionApi = {
+  language, // extensions ship their own strings and pick them with this code
   el,
   chip,
   compare: collator.compare,
@@ -191,20 +206,20 @@ const dimmed = p => !!state.meta[p] && activeExtensions().some(x => x.dimmed?.(s
 
 /* ========== theme ========== */
 
-const THEMES = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']]
+const THEMES = [['system', 'settings.system'], ['light', 'theme.light'], ['dark', 'theme.dark']]
 const systemDark = matchMedia('(prefers-color-scheme: dark)')
 const themePreference = () => localStorage.theme || 'system'
 
-// macOS accent colors: [id, label, dark appearance, light appearance, text on accent]
+// macOS accent colors: [id, label key, dark appearance, light appearance, text on accent]
 const ACCENTS = [
-  ['violet', 'Viola', '#8b7bff', '#6d5dfc', '#fff'],
-  ['blue', 'Blu', '#0a84ff', '#007aff', '#fff'],
-  ['pink', 'Rosa', '#ff375f', '#ff2d55', '#fff'],
-  ['red', 'Rosso', '#ff453a', '#ff3b30', '#fff'],
-  ['orange', 'Arancione', '#ff9f0a', '#f08c00', '#fff'],
-  ['yellow', 'Giallo', '#ffd60a', '#e6b800', '#1b1b22'],
-  ['green', 'Verde', '#30d158', '#28a745', '#fff'],
-  ['graphite', 'Grafite', '#98989d', '#8e8e93', '#fff'],
+  ['violet', 'accent.violet', '#8b7bff', '#6d5dfc', '#fff'],
+  ['blue', 'accent.blue', '#0a84ff', '#007aff', '#fff'],
+  ['pink', 'accent.pink', '#ff375f', '#ff2d55', '#fff'],
+  ['red', 'accent.red', '#ff453a', '#ff3b30', '#fff'],
+  ['orange', 'accent.orange', '#ff9f0a', '#f08c00', '#fff'],
+  ['yellow', 'accent.yellow', '#ffd60a', '#e6b800', '#1b1b22'],
+  ['green', 'accent.green', '#30d158', '#28a745', '#fff'],
+  ['graphite', 'accent.graphite', '#98989d', '#8e8e93', '#fff'],
 ]
 const currentAccent = () => ACCENTS.find(a => a[0] === localStorage.accent) || ACCENTS[0]
 const resolvedTheme = () => themePreference() === 'system' ? (systemDark.matches ? 'dark' : 'light') : themePreference()
@@ -221,7 +236,7 @@ function applyTheme() {
   root.style.setProperty('--on-accent', onAccent)
   // Window-level appearance waits for init, which tells whether the glass material is available.
   if (state.supportsGlass === undefined) return
-  call('appearance', { theme: themePreference(), glass: glassOn() })
+  call('appearance', { theme: themePreference(), glass: glassOn(), language })
   if (!viewerOpen()) syncWindowControls()
 }
 
@@ -230,7 +245,7 @@ function renderAccentPicker() {
   $('#accentPicker').replaceChildren(...ACCENTS.map(([id, label, dark, light]) => {
     const b = el('button', 'swatch' + (currentAccent()[0] === id ? ' on' : ''))
     b.type = 'button'
-    b.title = label
+    b.title = t(label)
     b.style.setProperty('--swatch', theme === 'dark' ? dark : light)
     b.onclick = () => {
       localStorage.accent = id
@@ -253,7 +268,7 @@ function syncWindowControls() {
 
 function renderThemePicker() {
   $('#themePicker').replaceChildren(...THEMES.map(([value, label]) => {
-    const b = el('button', themePreference() === value ? 'on' : '', label)
+    const b = el('button', themePreference() === value ? 'on' : '', t(label))
     b.type = 'button'
     b.onclick = () => {
       localStorage.theme = value
@@ -267,7 +282,22 @@ function renderThemePicker() {
 
 /* ========== settings ========== */
 
+function renderLanguagePicker() {
+  const options = [['system', t('settings.system')], ...LANGUAGES]
+  $('#languagePicker').replaceChildren(...options.map(([value, label]) => {
+    const b = el('button', languagePreference() === value ? 'on' : '', label)
+    b.type = 'button'
+    b.onclick = () => {
+      if (value === languagePreference()) return
+      localStorage.language = value
+      location.reload()
+    }
+    return b
+  }))
+}
+
 function openSettings() {
+  renderLanguagePicker()
   renderThemePicker()
   renderAccentPicker()
   $('#glassRow').hidden = !state.supportsGlass
@@ -291,13 +321,13 @@ function openSettings() {
 
 async function exportLibrary() {
   const count = await call('exportLibrary')
-  if (count != null) toast(`Esportati ${count} file con stati o tag`)
+  if (count != null) toast(t('data.exported', { n: count }))
 }
 
 async function importLibrary() {
   const count = await call('importLibrary')
   if (count == null) return
-  toast(`Importati ${count} file con stati o tag`)
+  toast(t('data.imported', { n: count }))
   refresh()
 }
 
@@ -338,14 +368,14 @@ function previewImg(item) {
 }
 
 const countLabel = data => [
-  data.files.length && `${data.files.length} file`,
-  data.folders.length && `${data.folders.length} cartell${data.folders.length > 1 ? 'e' : 'a'}`,
-].filter(Boolean).join(' · ') || 'vuota'
+  data.files.length && t.n('count.files', data.files.length),
+  data.folders.length && t.n('count.folders', data.folders.length),
+].filter(Boolean).join(' · ') || t('count.empty')
 
 // Fills a 2x2 collage with the first files of a folder; runs after the row is on screen.
 async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
   const data = await list(path)
-  countEl.textContent = filesOnly ? `${data.files.length} file` : countLabel(data)
+  countEl.textContent = filesOnly ? t.n('count.files', data.files.length) : countLabel(data)
   const files = sorted(data.files).slice(0, 4)
   if (files.length) collage.append(...files.map(previewImg))
   else collage.replaceChildren(icon('folderFill', 'finder-folder'))
@@ -387,14 +417,14 @@ async function render() {
     const count = folders.length + files.length
     $('#folders').hidden = true
     showContent(null, [
-      el('p', 'hint', `${count} element${count === 1 ? 'o' : 'i'} con questo filtro, in tutto il PC`),
-      count ? grid(folders, files, null) : el('p', 'empty', 'Nessun risultato'),
+      el('p', 'hint', t('filter.results', { items: t.n('count.items', count) })),
+      count ? grid(folders, files, null) : el('p', 'empty', t('filter.none')),
     ])
   } else {
     const data = await list(state.cwd)
     if (id !== renderId) return
     const folders = sorted(data.folders).filter(nameMatches)
-    const here = { name: 'File in questa cartella', path: state.cwd, self: true }
+    const here = { name: t('folder.here'), path: state.cwd, self: true }
     const pane = $('#folders')
     const entering = !samePath(pane.dataset.cwd, state.cwd)
     pane.dataset.cwd = state.cwd
@@ -452,18 +482,18 @@ async function renderPane(entry, data) {
 
   const head = el('div', 'pane-head')
   const title = el('div', 'pane-title')
-  title.append(el('h2', '', entry.name), el('span', 'fcount', entry.self ? `${data.files.length} file` : countLabel(data)))
+  title.append(el('h2', '', entry.name), el('span', 'fcount', entry.self ? t.n('count.files', data.files.length) : countLabel(data)))
   if (!entry.self) title.append(badges(entry.path))
   head.append(title)
   if (!entry.self) {
-    const open = el('button', 'ghost', 'Apri  →')
+    const open = el('button', 'ghost', t('folder.open') + '  →')
     open.onclick = () => navigate(entry.path)
     head.append(open)
   }
 
   showContent(entry.path, [
     head,
-    folders.length || files.length ? grid(folders, files, entry.path) : el('p', 'empty', 'Cartella vuota'),
+    folders.length || files.length ? grid(folders, files, entry.path) : el('p', 'empty', t('folder.empty')),
   ])
   paintSelection()
 }
@@ -484,27 +514,27 @@ function showContent(path, nodes) {
 
 /* ========== grouping ========== */
 
-const dayFormat = new Intl.DateTimeFormat('it', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-const monthFormat = new Intl.DateTimeFormat('it', { month: 'long', year: 'numeric' })
+const dayFormat = new Intl.DateTimeFormat(language, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+const monthFormat = new Intl.DateTimeFormat(language, { month: 'long', year: 'numeric' })
 const capitalize = text => text.charAt(0).toUpperCase() + text.slice(1)
 const startOfDay = time => new Date(time).setHours(0, 0, 0, 0)
 const extensionOf = name => name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
 
 function dayLabel(day) {
   const daysAgo = Math.round((startOfDay(Date.now()) - day) / 86400000)
-  if (daysAgo === 0) return 'Oggi'
-  if (daysAgo === 1) return 'Ieri'
+  if (daysAgo === 0) return t('day.today')
+  if (daysAgo === 1) return t('day.yesterday')
   return capitalize(dayFormat.format(day))
 }
 
 const FILE_KINDS = [
-  ['Immagini', f => f.type === 'img'],
-  ['Video', f => f.type === 'video'],
-  ['Documenti', f => /^(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|txt|md|csv)$/.test(extensionOf(f.name))],
-  ['Audio', f => /^(mp3|wav|flac|m4a|aac|ogg|opus)$/.test(extensionOf(f.name))],
-  ['Archivi', f => /^(zip|rar|7z|tar|gz|bz2|xz)$/.test(extensionOf(f.name))],
-  ['Programmi e collegamenti', f => /^(exe|msi|bat|cmd|ps1|lnk|url)$/.test(extensionOf(f.name))],
-  ['Altro', () => true],
+  ['kind.images', f => f.type === 'img'],
+  ['kind.videos', f => f.type === 'video'],
+  ['kind.documents', f => /^(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|txt|md|csv)$/.test(extensionOf(f.name))],
+  ['kind.audio', f => /^(mp3|wav|flac|m4a|aac|ogg|opus)$/.test(extensionOf(f.name))],
+  ['kind.archives', f => /^(zip|rar|7z|tar|gz|bz2|xz)$/.test(extensionOf(f.name))],
+  ['kind.programs', f => /^(exe|msi|bat|cmd|ps1|lnk|url)$/.test(extensionOf(f.name))],
+  ['kind.other', () => true],
 ]
 
 // Dates use the modification time, the same one behind the "most recent" sort.
@@ -515,8 +545,8 @@ const GROUPINGS = {
     label: month => capitalize(monthFormat.format(month)),
     compare: (a, b) => b - a,
   },
-  kind: { key: f => FILE_KINDS.findIndex(([, test]) => test(f)), label: i => FILE_KINDS[i][0], compare: (a, b) => a - b },
-  extension: { key: f => extensionOf(f.name), label: ext => ext ? ext.toUpperCase() : 'Senza estensione', compare: collator.compare },
+  kind: { key: f => FILE_KINDS.findIndex(([, test]) => test(f)), label: i => t(FILE_KINDS[i][0]), compare: (a, b) => a - b },
+  extension: { key: f => extensionOf(f.name), label: ext => ext ? ext.toUpperCase() : t('extension.none'), compare: collator.compare },
 }
 
 // Splits already sorted files into labelled groups; without a grouping returns a single unlabelled one.
@@ -570,7 +600,7 @@ function grid(folders, files, dir) {
   if (!groups[0]?.label) return block(files, folders)
 
   const root = el('div', 'groups')
-  if (folders.length) root.append(...groupSection('Cartelle', folders.length, block([], folders)))
+  if (folders.length) root.append(...groupSection(t('group.folders'), folders.length, block([], folders)))
   for (const g of groups) root.append(...groupSection(g.label, g.files.length, block(g.files)))
   return root
 }
@@ -753,16 +783,16 @@ async function reorder(dir, moving, target, insertAfter) {
 async function renameSelection() {
   const paths = selectedInOrder()
   if (paths.length === 1) {
-    const name = await ask('Nuovo nome', baseName(paths[0]), true)
+    const name = await ask(t('rename.prompt'), baseName(paths[0]), true)
     if (name && name !== baseName(paths[0])) {
       await call('renameMany', [[paths[0], name.trim()]])
       if (samePath(paths[0], state.focus)) setFocus(joinPath(parentDir(paths[0]), name.trim()))
     }
   } else if (paths.length > 1) {
     if (new Set(paths.map(p => parentDir(p).toLowerCase())).size > 1) {
-      return toast('Per numerare seleziona elementi della stessa cartella')
+      return toast(t('rename.sameFolder'))
     }
-    const label = await ask(`Nome base per ${paths.length} elementi, numerati nell'ordine a schermo (vuoto = solo numeri)`)
+    const label = await ask(t('rename.base', { n: paths.length }))
     if (label === null) return
     await renumber(paths, label.trim())
   }
@@ -782,7 +812,7 @@ async function setMeta(paths, op) {
 }
 
 async function newFolder() {
-  const name = await ask('Nome della nuova cartella', 'Nuova cartella')
+  const name = await ask(t('folder.newPrompt'), t('folder.newDefault'))
   if (name) { await call('mkdir', state.cwd, name.trim()); refresh() }
 }
 
@@ -824,14 +854,14 @@ function itemMenu(e) {
   const isFolder = single && $$('#main [data-folder].sel').length > 0
   const metas = paths.map(p => state.meta[p] || {})
   showMenu(e, [
-    single && { label: 'Apri', run: () => isFolder ? navigate(single) : call('open', single) },
-    isFolder && { label: 'Apri in una nuova scheda', run: () => newTab(single) },
-    single && { label: 'Mostra in Esplora file', run: () => call('reveal', single) },
-    isFolder && { label: isPinned(single) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(single) },
-    { label: single ? 'Rinomina…' : `Numera ${paths.length} elementi…`, key: 'F2', run: renameSelection },
+    single && { label: t('menu.open'), run: () => isFolder ? navigate(single) : call('open', single) },
+    isFolder && { label: t('menu.openNewTab'), run: () => newTab(single) },
+    single && { label: t('menu.reveal'), run: () => call('reveal', single) },
+    isFolder && { label: isPinned(single) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(single) },
+    { label: single ? t('menu.rename') : t('menu.number', { n: paths.length }), key: 'F2', run: renameSelection },
     ...activeExtensions().flatMap(x => x.menu ? ['-', ...x.menu(paths, metas)] : []),
     '-',
-    { label: 'Sposta nel Cestino', key: 'Canc', danger: true, run: trashSelection },
+    { label: t('menu.trash'), key: t('key.delete'), danger: true, run: trashSelection },
   ])
 }
 
@@ -895,14 +925,14 @@ function showViewer() {
       if (!isCurrent()) return
       if (preview?.bare) return media.replaceWith(preview.node)
       if (preview) return media.replaceWith(richPreviewFrame(preview))
-      const open = el('button', 'primary', 'Apri con il programma predefinito')
+      const open = el('button', 'primary', t('viewer.openWith'))
       open.onclick = () => call('open', file.path)
       media.append(docIcon(file.name, 'large'), el('div', 'name', file.name), open)
     })
   }
 
   const transparent = TRANSPARENT_IMAGE.test(file.name)
-  const hints = ['← → scorri', ...(transparent ? ['B sfondo'] : []), ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), 'Invio apri con programma', 'Spazio o Esc chiudi']
+  const hints = [t('viewer.hint.browse'), ...(transparent ? [t('viewer.hint.matte')] : []), ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), t('viewer.hint.open'), t('viewer.hint.close')]
   const bar = el('div', 'viewer-bar')
   bar.append(el('span', '', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
@@ -913,7 +943,7 @@ function showViewer() {
 
 /* Images that may contain transparency can be shown on a dark, light or checkerboard matte. */
 const TRANSPARENT_IMAGE = /\.(png|webp|gif|svg|avif|ico|bmp)$/i
-const MATTES = [['dark', 'Sfondo scuro'], ['light', 'Sfondo chiaro'], ['checker', 'Scacchiera']]
+const MATTES = [['dark', 'matte.dark'], ['light', 'matte.light'], ['checker', 'matte.checker']]
 const currentMatte = () => MATTES.some(([m]) => m === localStorage.matte) ? localStorage.matte : 'dark'
 
 function applyMatte() {
@@ -932,7 +962,7 @@ function matteSwitch() {
   for (const [matte, label] of MATTES) {
     const b = el('button')
     b.dataset.matte = matte
-    b.title = label
+    b.title = t(label)
     b.append(el('span', 'matte-sample'))
     b.onclick = () => setMatte(matte)
     switcher.append(b)
@@ -967,9 +997,9 @@ function placeButton(dir, name, kind) {
   b.onclick = () => navigate(dir)
   b.onauxclick = e => { if (e.button === 1) newTab(dir) }
   b.oncontextmenu = e => showMenu(e, [
-    { label: 'Apri in una nuova scheda', run: () => newTab(dir) },
-    { label: 'Apri in Esplora file', run: () => call('open', dir) },
-    { label: isPinned(dir) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(dir) },
+    { label: t('menu.openNewTab'), run: () => newTab(dir) },
+    { label: t('menu.openInExplorer'), run: () => call('open', dir) },
+    { label: isPinned(dir) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(dir) },
   ])
   dropTarget(b, dir)
   return b
@@ -983,7 +1013,8 @@ function renderPlaces() {
   }
   const kindOf = pin => state.places[rank(pin)]?.kind || 'folder'
   const ordered = [...pins].sort((a, b) => rank(a) - rank(b))
-  $('#favs').replaceChildren(...ordered.map(p => placeButton(p.path, p.name, kindOf(p))))
+  const nameOf = pin => kindOf(pin) === 'folder' ? pin.name : t('place.' + kindOf(pin))
+  $('#favs').replaceChildren(...ordered.map(p => placeButton(p.path, nameOf(p), kindOf(p))))
   $('#drives').replaceChildren(...state.drives.map(d => placeButton(d, d.slice(0, 2), 'drive')))
 }
 
@@ -1005,7 +1036,7 @@ function renderTabs() {
     const node = el('div', 'tab' + (i === tabIndex ? ' on' : ''))
     const close = el('button')
     close.append(icon('close'))
-    close.title = 'Chiudi scheda (Ctrl+W)'
+    close.title = t('tab.close')
     close.onclick = e => { e.stopPropagation(); closeTab(i) }
     node.append(el('span', '', baseName(tab.cwd)), close)
     node.title = tab.cwd
@@ -1016,7 +1047,7 @@ function renderTabs() {
   }))
   const add = el('button', 'new-tab')
   add.append(icon('plus'))
-  add.title = 'Nuova scheda (Ctrl+T)'
+  add.title = t('tab.new')
   add.onclick = () => newTab(state.cwd)
   strip.append(add)
 }
@@ -1096,16 +1127,16 @@ function setGroup(value) {
 
 /* ========== toolbar popup buttons ========== */
 
-const SORT_OPTIONS = [['name', 'Nome'], ['date', 'Più recenti']]
-const GROUP_OPTIONS = [['none', 'Nessun gruppo'], ['day', 'Per giorno'], ['month', 'Per mese'], ['kind', 'Per tipo'], ['extension', 'Per estensione']]
+const SORT_OPTIONS = [['name', 'sort.name'], ['date', 'sort.date']]
+const GROUP_OPTIONS = [['none', 'group.none'], ['day', 'group.day'], ['month', 'group.month'], ['kind', 'group.kind'], ['extension', 'group.extension']]
 
 // A button showing the current choice that opens the options as a menu, like a macOS pop-up button.
 function popupButton(button, options, current, pick) {
-  button.replaceChildren(el('span', '', options.find(([value]) => value === current)?.[1]), icon('chevronDown'))
+  button.replaceChildren(el('span', '', t(options.find(([value]) => value === current)?.[1])), icon('chevronDown'))
   button.onclick = () => {
     const r = button.getBoundingClientRect()
     showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 6 },
-      options.map(([value, label]) => ({ label, check: value === current, run: () => pick(value) })))
+      options.map(([value, label]) => ({ label: t(label), check: value === current, run: () => pick(value) })))
   }
 }
 
@@ -1120,9 +1151,9 @@ function bindEvents() {
   const main = $('#main')
   main.addEventListener('click', clearSelection)
   main.addEventListener('contextmenu', e => showMenu(e, [
-    { label: 'Nuova cartella', run: newFolder },
-    { label: 'Apri in Esplora file', run: () => call('open', state.cwd) },
-    { label: isPinned(state.cwd) ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', run: () => togglePin(state.cwd) },
+    { label: t('menu.newFolder'), run: newFolder },
+    { label: t('menu.openInExplorer'), run: () => call('open', state.cwd) },
+    { label: isPinned(state.cwd) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(state.cwd) },
   ]))
 
   const contentPane = $('#content')
@@ -1241,6 +1272,7 @@ function zoom(section, step) {
 
 // Runs after every extension script has registered itself.
 document.addEventListener('DOMContentLoaded', async () => {
+  translateStaticText()
   applyTheme()
   bindEvents()
   const init = await call('init')
@@ -1250,9 +1282,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderControls()
   applySizes()
 
-  const saved = store.get('tabs', []).filter(t => t?.cwd)
-  const existing = (await call('items', saved.map(t => t.cwd))) || []
-  tabs = saved.filter(t => existing.some(i => samePath(i.path, t.cwd)))
+  const saved = store.get('tabs', []).filter(tab => tab?.cwd)
+  const existing = (await call('items', saved.map(tab => tab.cwd))) || []
+  tabs = saved.filter(tab => existing.some(i => samePath(i.path, tab.cwd)))
   tabIndex = Math.max(0, Math.min(store.get('tabIndex', 0), tabs.length - 1))
   if (init.start) {
     tabs.push({ cwd: init.start, focus: null })
