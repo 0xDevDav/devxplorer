@@ -28,7 +28,7 @@ registerExtension(({ el, chip, compare, ask, setMeta, render }) => {
       all.forEach(m => m.tags?.forEach(t => { counts[t] = (counts[t] || 0) + 1 }))
       return Object.keys(counts).sort(compare).map(t => chip(
         filter === t,
-        [el('i', 'dot tag-dot'), el('span', '', t)],
+        [el('span', '', '#' + t)],
         () => { filter = filter === t ? null : t; render() },
         counts[t],
       ))

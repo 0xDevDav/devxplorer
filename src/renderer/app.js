@@ -626,7 +626,14 @@ function fileCard(file, siblings) {
   card.append(thumb, el('div', 'name', file.name))
   card.title = file.path
   selectable(card, file.path, false)
-  card.addEventListener('dblclick', () => openViewer(siblings, file))
+  // Double click opens photos and videos in the viewer and every other file in its default program;
+  // Space previews any file (see preview below).
+  const isMedia = f => f.type === 'img' || f.type === 'video'
+  card.preview = () => openViewer(siblings, file)
+  card.addEventListener('dblclick', () => {
+    if (isMedia(file)) openViewer(siblings.filter(isMedia), file)
+    else call('open', file.path)
+  })
 
   // Dropping on a card inserts before or after it, depending on the pointer's half.
   const after = e => { const r = card.getBoundingClientRect(); return e.clientX > r.left + r.width / 2 }
@@ -1106,7 +1113,7 @@ function bindEvents() {
     if (viewerOpen()) return viewerKey(e)
     if (e.key === ' ') {
       e.preventDefault()
-      return $('#content .item.sel:not(.folder)')?.dispatchEvent(new MouseEvent('dblclick'))
+      return $('#content .item.sel:not(.folder)')?.preview()
     }
 
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
