@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, nativeImage, nativeTheme, Menu, dial
 const fs = require('fs')
 const os = require('os')
 const fsp = fs.promises
+const { execFile, spawn } = require('child_process')
 const path = require('path')
 const library = require('./library')
 const exif = require('./exif')
@@ -47,6 +48,27 @@ async function uniquePath(p) {
   for (let i = 2; fs.existsSync(p); i++) p = `${stem} (${i})${ext}`
   return p
 }
+
+// PowerShell single-quoted literal, for paths passed into a -Command script.
+const psQuote = s => `'${s.replace(/'/g, "''")}'`
+
+function powershell(script) {
+  return new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+    { windowsHide: true }, (error, stdout, stderr) => error ? reject(new Error(stderr.trim().split(/\r?\n/)[0] || error.message)) : resolve(stdout)))
+}
+
+// Starts a program on its own, outside the app's process tree and environment quirks.
+function launch(file, args, options = {}) {
+  const env = { ...process.env }
+  delete env.ELECTRON_RUN_AS_NODE
+  spawn(file, args, { detached: true, stdio: 'ignore', env, ...options }).unref()
+}
+
+const WINDOWS_TERMINAL = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WindowsApps', 'wt.exe')
+const VS_CODE = [
+  path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Microsoft VS Code', 'Code.exe'),
+  path.join(process.env.ProgramFiles || '', 'Microsoft VS Code', 'Code.exe'),
+].find(p => fs.existsSync(p))
 
 async function describe(p) {
   const stat = await fsp.stat(p).catch(() => null)
@@ -277,6 +299,44 @@ const handlers = {
 
   open: p => shell.openPath(p),
   reveal: p => shell.showItemInFolder(p),
+
+  // The Windows "Open with" chooser.
+  openWith: p => launch('rundll32.exe', ['shell32.dll,OpenAs_RunDLL', p]),
+
+  runAsAdmin: p => powershell(`Start-Process -LiteralPath ${psQuote(p)} -Verb RunAs`).catch(() => null),
+
+  // Windows Terminal when installed, otherwise the classic command prompt.
+  openTerminal(dir) {
+    if (fs.existsSync(WINDOWS_TERMINAL)) launch(WINDOWS_TERMINAL, ['-d', dir])
+    else launch('cmd.exe', [], { cwd: dir })
+  },
+
+  hasVsCode: () => !!VS_CODE,
+  openInVsCode: paths => VS_CODE && launch(VS_CODE, paths),
+
+  // A .lnk next to the item, named as Windows names new shortcuts.
+  async createShortcut(p) {
+    const name = t('shortcut.name', { name: path.basename(p, path.extname(p)) })
+    const link = await uniquePath(path.join(path.dirname(p), name + '.lnk'))
+    if (!shell.writeShortcutLink(link, { target: p })) throw new Error(t('error.shortcut'))
+    return link
+  },
+
+  // Zips the items into the folder of the first one: "name.zip" for one item, "Archive.zip" for more.
+  async compress(paths) {
+    const dir = path.dirname(paths[0])
+    const base = paths.length === 1 ? path.basename(paths[0], fs.statSync(paths[0]).isDirectory() ? '' : path.extname(paths[0])) : t('zip.archive')
+    const dest = await uniquePath(path.join(dir, base + '.zip'))
+    await powershell(`Compress-Archive -LiteralPath ${paths.map(psQuote).join(',')} -DestinationPath ${psQuote(dest)}`)
+    return dest
+  },
+
+  // Extracts a .zip into a new folder named after it.
+  async extract(p) {
+    const dest = await uniquePath(path.join(path.dirname(p), path.basename(p, path.extname(p))))
+    await powershell(`Expand-Archive -LiteralPath ${psQuote(p)} -DestinationPath ${psQuote(dest)}`)
+    return dest
+  },
 
   // Returns [[from, to]] for every item actually moved, so the move can be undone.
   async move(paths, dest) {

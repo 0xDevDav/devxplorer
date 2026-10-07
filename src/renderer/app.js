@@ -1075,21 +1075,54 @@ function showMenu(e, items) {
   menu.style.top = Math.min(e.clientY, innerHeight - menu.offsetHeight - 8) + 'px'
 }
 
+const RUNNABLE_EXT = /^(exe|msi|bat|cmd|lnk)$/
+let hasVsCode = false
+
+// Copies full paths, one per line, as Windows "Copy as path" without the quotes.
+function copyPaths(paths) {
+  if (!paths.length) return
+  call('copyText', paths.join('\r\n'))
+  toast(t.n('toast.pathCopied', paths.length), 'info')
+}
+
+// Runs a main-process action that creates a file next to the selection, then shows it.
+async function createNear(action, ...args) {
+  const created = await call(action, ...args)
+  if (!created) return
+  await refresh()
+  state.selection = new Set([created])
+  paintSelection()
+}
+
+// Terminal and VS Code open a folder itself, or the folder that contains a file.
+const folderOf = (path, isFolder) => isFolder ? path : parentDir(path)
+
 function itemMenu(e) {
   const paths = selectedInOrder()
   const single = paths.length === 1 ? paths[0] : null
   const isFolder = single && $$('#main [data-folder].sel').length > 0
+  const ext = single && !isFolder ? extensionOf(baseName(single)) : ''
   const metas = paths.map(p => state.meta[p] || {})
   showMenu(e, [
     single && { label: t('menu.open'), run: () => isFolder ? navigate(single) : call('open', single) },
     isFolder && { label: t('menu.openNewTab'), run: () => newTab(single) },
+    single && !isFolder && { label: t('menu.openWith'), run: () => call('openWith', single) },
+    RUNNABLE_EXT.test(ext) && { label: t('menu.runAsAdmin'), run: () => call('runAsAdmin', single) },
+    '-',
+    single && { label: t('menu.terminal'), run: () => call('openTerminal', folderOf(single, isFolder)) },
+    hasVsCode && { label: t('menu.vscode'), run: () => call('openInVsCode', paths) },
     single && { label: t('menu.reveal'), run: () => call('reveal', single) },
     isFolder && { label: isPinned(single) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(single) },
-    { label: single ? t('menu.rename') : t('menu.number', { n: paths.length }), key: 'F2', run: renameSelection },
     '-',
+    { label: single ? t('menu.rename') : t('menu.number', { n: paths.length }), key: 'F2', run: renameSelection },
     { label: t('menu.copy'), key: 'Ctrl+C', run: () => copySelection(false) },
     { label: t('menu.cut'), key: 'Ctrl+X', run: () => copySelection(true) },
     { label: t('menu.duplicate'), key: 'Ctrl+D', run: duplicateSelection },
+    { label: t('menu.copyPath'), key: 'Ctrl+Shift+C', run: () => copyPaths(paths) },
+    '-',
+    single && { label: t('menu.shortcut'), run: () => createNear('createShortcut', single) },
+    { label: t('menu.compress'), run: () => createNear('compress', paths) },
+    ext === 'zip' && { label: t('menu.extract'), run: () => createNear('extract', single) },
     ...activeExtensions().flatMap(x => x.menu ? ['-', ...x.menu(paths, metas)] : []),
     '-',
     { label: t('menu.trash'), key: t('key.delete'), danger: true, run: trashSelection },
@@ -1431,6 +1464,8 @@ function placeButton(dir, name, kind) {
   b.oncontextmenu = e => showMenu(e, [
     { label: t('menu.openNewTab'), run: () => newTab(dir) },
     { label: t('menu.openInExplorer'), run: () => call('open', dir) },
+    { label: t('menu.terminal'), run: () => call('openTerminal', dir) },
+    { label: t('menu.copyPath'), run: () => copyPaths([dir]) },
     { label: isPinned(dir) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(dir) },
   ])
   dropTarget(b, dir)
@@ -1816,7 +1851,11 @@ function bindEvents() {
   main.addEventListener('contextmenu', e => showMenu(e, [
     clipboard && { label: t('menu.paste'), key: 'Ctrl+V', run: paste },
     { label: t('menu.newFolder'), run: newFolder },
+    '-',
+    { label: t('menu.terminal'), run: () => call('openTerminal', state.cwd) },
+    hasVsCode && { label: t('menu.vscode'), run: () => call('openInVsCode', [state.cwd]) },
     { label: t('menu.openInExplorer'), run: () => call('open', state.cwd) },
+    { label: t('menu.copyPath'), run: () => copyPaths([state.cwd]) },
     { label: isPinned(state.cwd) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(state.cwd) },
   ]))
 
@@ -1855,6 +1894,7 @@ function bindEvents() {
       z: undo,
     }[e.key.toLowerCase()]
     if (clipboardKey) { e.preventDefault(); return clipboardKey() }
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c') { e.preventDefault(); return copyPaths(selectedInOrder()) }
     if (e.key === ' ') {
       e.preventDefault()
       // A folder has nothing to preview, so Space opens it like Enter.
@@ -2053,6 +2093,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   translateStaticText()
   applyTheme()
   bindEvents()
+  call('hasVsCode').then(found => { hasVsCode = found })
   const init = await call('init')
   Object.assign(state, { places: init.places, drives: init.drives, supportsGlass: init.supportsGlass })
   applyTheme()
