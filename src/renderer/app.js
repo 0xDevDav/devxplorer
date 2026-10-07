@@ -51,6 +51,8 @@ const ICONS = {
   drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+  viewIcons: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
+  viewList: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" stroke-width="2.6"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -125,6 +127,7 @@ const state = {
   reverse: localStorage.reverse === 'true',
   showHidden: localStorage.showHidden === 'true',
   searchDeep: localStorage.searchDeep === 'true', // search also in subfolders
+  view: localStorage.view || 'icons', // 'icons' or 'list'
   group: localStorage.group || 'none',
   query: '',
 }
@@ -429,6 +432,7 @@ const SHORTCUTS = [
   ['keys.group.view', [
     ['Ctrl++|Ctrl+-|Ctrl+key.wheel', 'keys.zoom'],
     ['Ctrl+0', 'keys.zoomReset'],
+    ['Ctrl+1|Ctrl+2', 'keys.view'],
     ['Ctrl+Shift+.', 'menu.showHidden'],
   ]],
   ['keys.group.viewer', [
@@ -834,21 +838,90 @@ function groupSection(label, count, content) {
 function grid(folders, files, dir) {
   const groups = groupFiles(files)
   const displayOrder = groups.flatMap(g => g.files) // viewer navigation follows what is on screen
+  const asList = state.view === 'list'
   const block = (items, folderItems = []) => {
-    const node = el('div', 'grid')
+    const node = el('div', asList ? 'list' : 'grid')
     node.setAttribute('role', 'listbox')
     node.setAttribute('aria-multiselectable', 'true')
-    folderItems.forEach(f => node.append(folderTile(f)))
-    items.forEach(f => node.append(fileCard(f, displayOrder)))
+    folderItems.forEach(f => node.append(asList ? folderListRow(f) : folderTile(f)))
+    items.forEach(f => node.append(asList ? fileListRow(f, displayOrder) : fileCard(f, displayOrder)))
     if (dir) dropTarget(node, dir)
     return node
   }
+  if (asList) {
+    const view = el('div', 'list-view')
+    view.append(listHeader(), groups[0]?.label ? groupedBlocks(groups, folders, block) : block(files, folders))
+    return view
+  }
   if (!groups[0]?.label) return block(files, folders)
+  return groupedBlocks(groups, folders, block)
+}
 
+function groupedBlocks(groups, folders, block) {
   const root = el('div', 'groups')
   if (folders.length) root.append(...groupSection(t('group.folders'), folders.length, block([], folders)))
   for (const g of groups) root.append(...groupSection(g.label, g.files.length, block(g.files)))
   return root
+}
+
+/* ---------- list view ---------- */
+
+// Columns of the list view; clicking a title sorts by it, clicking it again reverses the order.
+const LIST_COLUMNS = [['name', 'sort.name'], ['date', 'list.modified'], ['size', 'sort.size'], ['kind', 'sort.kind']]
+
+function listHeader() {
+  const head = el('div', 'list-head')
+  for (const [sort, label] of LIST_COLUMNS) {
+    const b = el('button', 'col-' + sort + (state.sort === sort ? ' on' : ''), t(label))
+    if (state.sort === sort) b.append(icon('chevronDown', state.reverse ? 'up' : ''))
+    b.onclick = () => {
+      if (state.sort === sort) { state.reverse = !state.reverse; localStorage.reverse = state.reverse }
+      setSort(sort)
+    }
+    head.append(b)
+  }
+  return head
+}
+
+const listDate = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
+
+function listCells(item, iconNode, name, kind, size) {
+  const nameCell = el('span', 'col-name')
+  nameCell.append(iconNode, el('span', 'name', name), badges(item.path))
+  return [nameCell, el('span', 'col-date', listDate.format(item.mtime)), el('span', 'col-size', size), el('span', 'col-kind', kind)]
+}
+
+function folderListRow(folder) {
+  const row = el('div', 'item folder lrow' + (dimmed(folder.path) ? ' dim' : '') + (folder.hidden ? ' hidden-item' : ''))
+  row.append(...listCells(folder, icon('folderFill', 'row-icon finder-folder'), folder.name, t('info.folder'), '—'))
+  row.title = folder.path
+  selectable(row, folder.path, true)
+  row.addEventListener('dblclick', () => navigate(folder.path))
+  dropTarget(row, folder.path)
+  return row
+}
+
+// Pictures, videos, programs and models show a small preview; other files their document icon.
+function fileListRow(file, siblings) {
+  const row = el('div', 'item lrow' + (dimmed(file.path) ? ' dim' : '') + (file.hidden ? ' hidden-item' : ''))
+  const ext = extensionOf(file.name)
+  const visual = file.type !== 'file' || docKind(file.name) === 'app' || MESH_EXT.test(file.name)
+  const iconNode = el('span', 'row-icon')
+  iconNode.append(visual ? previewImg(file) : icon('documents'))
+  row.append(...listCells(file, iconNode, file.name, ext ? t('info.kindFile', { ext: ext.toUpperCase() }) : '—', formatBytes(file.size)))
+  row.title = file.path
+  selectable(row, file.path, false)
+  const isMedia = f => f.type === 'img' || f.type === 'video'
+  row.preview = () => openViewer(siblings, file)
+  row.open = () => isMedia(file) ? openViewer(siblings.filter(isMedia), file) : call('open', file.path)
+  row.addEventListener('dblclick', row.open)
+  return row
+}
+
+function setView(view) {
+  state.view = localStorage.view = view
+  renderControls()
+  render()
 }
 
 function setFocus(path) {
@@ -2191,6 +2264,7 @@ function popupButton(button, options, current, pick, iconName, extra = []) {
 }
 
 function renderControls() {
+  for (const b of $$('#viewSwitch button')) b.classList.toggle('on', b.dataset.view === state.view)
   popupButton($('#sort'), SORT_OPTIONS, state.sort, setSort, 'sort', [
     { label: t('sort.reverse'), check: state.reverse, run: () => { state.reverse = !state.reverse; localStorage.reverse = state.reverse; renderControls(); render() } },
   ])
@@ -2266,6 +2340,7 @@ function bindEvents() {
     }
 
     if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette() }
+    if (e.ctrlKey && (e.code === 'Digit1' || e.code === 'Digit2')) { e.preventDefault(); return setView(e.code === 'Digit1' ? 'icons' : 'list') }
     if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); return showItemInfo(selectedInOrder()) }
     if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); return editPath() }
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
@@ -2297,6 +2372,10 @@ function bindEvents() {
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
   $('#settingsBtn').replaceChildren(icon('gear'))
   $('#settingsBtn').onclick = openSettings
+  for (const b of $$('#viewSwitch button')) {
+    b.replaceChildren(icon(b.dataset.view === 'list' ? 'viewList' : 'viewIcons'))
+    b.onclick = () => setView(b.dataset.view)
+  }
   $('#backBtn').replaceChildren(icon('chevronLeft'))
   $('#forwardBtn').replaceChildren(icon('chevron'))
   $('#backBtn').onclick = () => goHistory(-1)

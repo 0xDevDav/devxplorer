@@ -378,6 +378,38 @@ body.inactive .frow.sel { color: var(--text); background: var(--line-strong) }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--size), 1fr)); gap: 12px; padding: 4px; border-radius: var(--r-lg) }
 
+/* Toolbar view switch: icons or list */
+#viewSwitch { margin: 0; padding: 2px; border-radius: var(--r-md) }
+#viewSwitch button { display: grid; place-items: center; width: 30px; height: 24px; padding: 0; border-radius: var(--r-sm) }
+#viewSwitch .icon { width: 16px; height: 16px }
+
+/* List view: a header of sortable columns over one row per item */
+.list-view { --list-cols: minmax(220px, 1fr) 170px 90px 110px }
+.list-head { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: var(--list-cols); padding: 0 8px; background: var(--bg); border-bottom: 1px solid var(--line) }
+.list-head button { display: flex; align-items: center; gap: 4px; padding: 6px 8px; font-size: 12px; text-align: left; color: var(--muted); background: none; border: 0; border-radius: 0; cursor: pointer }
+.list-head button:hover, .list-head button.on { color: var(--text) }
+.list-head .icon { width: 12px; height: 12px }
+.list-head .icon.up { transform: rotate(180deg) }
+.list-head .col-size, .lrow .col-size { justify-content: flex-end; text-align: right }
+.list { display: flex; flex-direction: column; padding: 4px 0 }
+#content .item.lrow { display: grid; grid-template-columns: var(--list-cols); align-items: center; height: 30px; padding: 0 8px; border-radius: var(--r-sm); contain-intrinsic-size: auto 30px }
+.list .lrow:nth-child(even) { background: var(--hover) }
+.lrow > span { min-width: 0; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-label) }
+.lrow .col-name { display: flex; align-items: center; gap: 8px; color: var(--text) }
+.lrow .col-name .name { width: auto; margin: 0; padding: 0; background: none; color: inherit; overflow: hidden; text-overflow: ellipsis }
+.lrow .badges { display: flex; flex: none; gap: 4px }
+.row-icon { display: grid; place-items: center; flex: none; width: 20px; height: 20px; overflow: hidden; border-radius: 4px }
+.row-icon img { width: 100%; height: 100%; object-fit: cover }
+.row-icon .app-icon { background: none }
+.row-icon .app-icon .glyph, .row-icon .app-icon .glyph.native { width: 100% }
+.row-icon .app-icon.shortcut .glyph::after { display: none }
+.row-icon > .icon { width: 18px; height: 18px; color: var(--muted) }
+.lrow .icon.row-icon { color: var(--folder) }
+.list .item.lrow.sel, .list .item.lrow.sel:nth-child(even) { background: var(--accent) }
+.list .item.lrow.sel > span, .list .item.lrow.sel .name { color: var(--on-accent); background: none }
+body.inactive .list .item.lrow.sel { background: var(--line-strong) }
+body.inactive .list .item.lrow.sel > span { color: var(--text) }
+
 /* group separators stick to the top of the pane while their group is in view */
 .group-head {
   position: sticky;
