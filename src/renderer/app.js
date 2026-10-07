@@ -754,12 +754,16 @@ async function treeNode(dir, name, depth) {
 }
 
 /*
- * Hovering a sidebar folder previews it over the content area, at nearly the size it would have
- * once opened, on a dimmed backdrop. Moving the pointer onto the preview opens that folder.
- * The folder already open is not previewed. Once a preview is up, moving to another folder swaps
- * it instantly; the grace period on leave keeps it up while the pointer travels to it.
+ * Resting the pointer on a sidebar folder previews it over the content area, at nearly the size it
+ * would have once opened, on a dimmed backdrop. Moving the pointer onto the preview opens that folder.
+ * The folder already open is not previewed.
+ *
+ * The preview only appears once the pointer stays still on a row (any movement restarts the wait),
+ * so scanning the sidebar never triggers it. With a preview up, switching rows waits a shorter
+ * time; the grace period on leave keeps it up while the pointer travels to it.
  */
-const PEEK_DELAY_MS = 350
+const PEEK_REST_MS = 700
+const PEEK_SWITCH_MS = 250
 const PEEK_GRACE_MS = 300
 const PEEK_MARGIN = 24
 const PEEK_MAX_ITEMS = 60
@@ -769,10 +773,18 @@ const peekOpen = () => $('#peek').classList.contains('show')
 
 function hoverPreview(row, dir, name) {
   let timer
+  const wait = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => showPeek(dir, name), peekOpen() ? PEEK_SWITCH_MS : PEEK_REST_MS)
+  }
   row.addEventListener('mouseenter', () => {
     clearTimeout(peekHideTimer)
     if (samePath(dir, state.cwd)) return hidePeek()
-    timer = setTimeout(() => showPeek(dir, name), peekOpen() ? 0 : PEEK_DELAY_MS)
+    wait()
+  })
+  row.addEventListener('mousemove', () => {
+    const alreadyShown = peekOpen() && samePath(dir, $('#peek').dataset.dir)
+    if (!samePath(dir, state.cwd) && !alreadyShown) wait()
   })
   row.addEventListener('mouseleave', () => {
     clearTimeout(timer)
