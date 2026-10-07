@@ -4,8 +4,8 @@
  * Files are identified by content: key = "file:<size>:<hash>", where the hash covers the whole
  * file when small, or three 64 KB samples (start, middle, end) otherwise. Annotations therefore
  * follow a file wherever it is moved or renamed, by any program, and identical copies share them.
- * Folders have no stable content, so they are identified by path ("dir:<path>") and followed
- * when moved or renamed through this app.
+ * Folders and empty files have no distinguishing content, so they are identified by path
+ * ("path:<path>") and followed when moved or renamed through this app.
  *
  * Tables
  *   annotations (key, field, value)       one row per value; "tag" is multi-valued, other fields single-valued
@@ -113,7 +113,7 @@ async function fingerprint(p, size) {
 }
 
 async function keyFor(p, stat, force = false) {
-  if (stat.isDirectory()) return 'dir:' + p.toLowerCase()
+  if (stat.isDirectory() || stat.size === 0) return 'path:' + p.toLowerCase()
   if (!force && !annotatedSizes.has(stat.size)) return null
   const known = q.location.get(p)
   if (known && known.size === stat.size && known.mtime === stat.mtimeMs) return known.key
@@ -140,7 +140,7 @@ async function metaFor(p, stat) {
 // op: { status } sets or clears the status, { add } / { remove } edit tags.
 async function annotate(p, stat, op) {
   const key = await keyFor(p, stat, true)
-  if (stat.isDirectory()) q.putLocation.run(p, 0, 0, key)
+  if (key.startsWith('path:')) q.putLocation.run(p, 0, 0, key)
   transaction(() => {
     if ('status' in op) {
       q.clearField.run(key, 'status')
@@ -152,13 +152,13 @@ async function annotate(p, stat, op) {
   loadSizes()
 }
 
-// Keeps locations and folder keys in sync after a move or rename made by this app.
+// Keeps locations and path-based keys in sync after a move or rename made by this app.
 function relocate(from, to) {
   transaction(() => {
     for (const row of q.allLocations.all()) {
       if (!isUnder(row.path, from)) continue
       const next = to + row.path.slice(from.length)
-      const key = row.key.startsWith('dir:') ? 'dir:' + next.toLowerCase() : row.key
+      const key = row.key.startsWith('path:') ? 'path:' + next.toLowerCase() : row.key
       q.dropLocation.run(row.path)
       q.putLocation.run(next, row.size, row.mtime, key)
       if (key !== row.key) q.rekey.run(key, row.key)
@@ -178,7 +178,7 @@ function allMeta() {
 }
 
 /*
- * Exports file annotations only: folder keys are local paths, meaningless on another PC,
+ * Exports content-keyed annotations only: path-based keys are local paths, meaningless on another PC,
  * and would disclose the local folder structure to whoever receives the file.
  */
 function exportTo(file) {

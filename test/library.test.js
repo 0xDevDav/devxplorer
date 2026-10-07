@@ -36,6 +36,14 @@ test('file annotations follow content across moves, renames and copies', async (
   assert.equal(await metaOf(at('c', 'same-size.jpg')), null)
 })
 
+test('empty files do not share annotations', async () => {
+  write(at('empty', 'a.txt'), '')
+  write(at('empty', 'b.txt'), '')
+  await library.annotate(at('empty', 'a.txt'), fs.statSync(at('empty', 'a.txt')), { status: 'drop' })
+  assert.equal((await metaOf(at('empty', 'a.txt'))).status, 'drop')
+  assert.equal(await metaOf(at('empty', 'b.txt')), null)
+})
+
 test('folder annotations follow moves made through the app', async () => {
   fs.mkdirSync(at('set', 'carousel'), { recursive: true })
   await library.annotate(at('set', 'carousel'), fs.statSync(at('set', 'carousel')), { status: 'todo' })
