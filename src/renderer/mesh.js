@@ -101,13 +101,13 @@ function parsePly(bytes) {
 
   if (format === 'ascii') {
     const tokens = decodeText(bytes.subarray(offset)).trim().split(/\s+/).map(Number)
-    let t = 0
+    let cursor = 0
     for (const element of elements) {
       for (let n = 0; n < element.count; n++) {
         const values = {}
         let list = null
         for (const prop of element.props) {
-          if (prop.list) { const count = tokens[t++]; list = tokens.slice(t, t + count); t += count } else values[prop.name] = tokens[t++]
+          if (prop.list) { const count = tokens[cursor++]; list = tokens.slice(cursor, cursor + count); cursor += count } else values[prop.name] = tokens[cursor++]
         }
         if (element.name === 'vertex') takeVertex(values)
         else if (element.name === 'face' && list) takeFace(list)
@@ -193,8 +193,8 @@ const composeTransforms = (inner, outer) => {
   const [x0, y0, z0] = applyTransform(outer, inner[0], inner[1], inner[2]).map((v, i) => v - outer[9 + i])
   const [x1, y1, z1] = applyTransform(outer, inner[3], inner[4], inner[5]).map((v, i) => v - outer[9 + i])
   const [x2, y2, z2] = applyTransform(outer, inner[6], inner[7], inner[8]).map((v, i) => v - outer[9 + i])
-  const t = applyTransform(outer, inner[9], inner[10], inner[11])
-  return [x0, y0, z0, x1, y1, z1, x2, y2, z2, ...t]
+  const offset = applyTransform(outer, inner[9], inner[10], inner[11])
+  return [x0, y0, z0, x1, y1, z1, x2, y2, z2, ...offset]
 }
 
 async function parse3mf(bytes) {

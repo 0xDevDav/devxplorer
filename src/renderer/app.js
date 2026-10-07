@@ -82,14 +82,17 @@ function icon(name, cls = '') {
  * Files without a preview show a document icon in the style of macOS: a page with a folded
  * corner and a label in the color of the file family.
  */
+const AUDIO_EXT = /^(mp3|wav|flac|m4a|aac|ogg|opus)$/
+const ARCHIVE_EXT = /^(zip|rar|7z|tar|gz|bz2|xz)$/
+const PROGRAM_EXT = /^(exe|msi|bat|cmd|ps1|lnk|url|appx|msix)$/
 const DOC_KINDS = [
   ['pdf', /^pdf$/],
   ['word', /^(docx?|odt|rtf|pages)$/],
   ['sheet', /^(xlsx?|ods|numbers)$/],
   ['slides', /^(pptx?|odp|key)$/],
-  ['archive', /^(zip|rar|7z|tar|gz|bz2|xz)$/],
-  ['audio', /^(mp3|wav|flac|m4a|aac|ogg|opus)$/],
-  ['app', /^(exe|msi|bat|cmd|ps1|lnk|url|appx|msix)$/],
+  ['archive', ARCHIVE_EXT],
+  ['audio', AUDIO_EXT],
+  ['app', PROGRAM_EXT],
 ]
 
 const docKind = name => DOC_KINDS.find(([, test]) => test.test(extensionOf(name)))?.[0] || 'other'
@@ -224,7 +227,7 @@ function chip(on, children, onclick, count) {
 }
 
 const extensionApi = {
-  language, // extensions ship their own strings and pick them with this code
+  t, // translator; extension strings live in messages.js under ext.<id>.*
   el,
   chip,
   compare: collator.compare,
@@ -724,9 +727,9 @@ const FILE_KINDS = [
   ['kind.images', f => f.type === 'img'],
   ['kind.videos', f => f.type === 'video'],
   ['kind.documents', f => /^(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|txt|md|csv)$/.test(extensionOf(f.name))],
-  ['kind.audio', f => /^(mp3|wav|flac|m4a|aac|ogg|opus)$/.test(extensionOf(f.name))],
-  ['kind.archives', f => /^(zip|rar|7z|tar|gz|bz2|xz)$/.test(extensionOf(f.name))],
-  ['kind.programs', f => /^(exe|msi|bat|cmd|ps1|lnk|url)$/.test(extensionOf(f.name))],
+  ['kind.audio', f => AUDIO_EXT.test(extensionOf(f.name))],
+  ['kind.archives', f => ARCHIVE_EXT.test(extensionOf(f.name))],
+  ['kind.programs', f => PROGRAM_EXT.test(extensionOf(f.name))],
   ['kind.other', () => true],
 ]
 
@@ -915,10 +918,8 @@ function fileCard(file, siblings) {
   // Space previews any file (see preview below).
   const isMedia = f => f.type === 'img' || f.type === 'video'
   card.preview = () => openViewer(siblings, file)
-  card.addEventListener('dblclick', () => {
-    if (isMedia(file)) openViewer(siblings.filter(isMedia), file)
-    else call('open', file.path)
-  })
+  card.open = () => isMedia(file) ? openViewer(siblings.filter(isMedia), file) : call('open', file.path)
+  card.addEventListener('dblclick', card.open)
 
   // Dropping files from another folder moves them here. Holding Alt reorders within the folder:
   // the files are inserted before or after this card, by the pointer's half, and renumbered.
@@ -1246,6 +1247,12 @@ function togglePin(p) {
 
 /* ========== context menu ========== */
 
+// Opens a menu under an element, like a pop-up button.
+function menuBelow(node, items, gap = 6) {
+  const r = node.getBoundingClientRect()
+  showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + gap }, items)
+}
+
 function showMenu(e, items) {
   e.preventDefault()
   const menu = $('#menu')
@@ -1349,8 +1356,8 @@ const viewerOpen = () => $('#viewer').classList.contains('show')
 
 function openViewer(items, current) {
   viewer = { items, index: items.findIndex(x => x.path === current.path) }
-  // With the glass material the controls stay transparent over the black viewer: Windows does not
-  // clear an opaque overlay color when switching back to transparent, which left a black block.
+  // With the glass material the controls stay transparent over the black viewer: Windows cannot
+  // switch an overlay from an opaque color back to transparent.
   call('overlay', { color: glassOn() ? '#00000000' : '#000000', symbolColor: '#c9c9d4' })
   call('setViewerOpen', true)
   showViewer()
@@ -1558,9 +1565,9 @@ function exposureLabel(info) {
 
 function infoPanel(file, media) {
   const panel = el('aside', 'info-panel')
-  const list = el('dl')
-  panel.append(el('h4', '', file.name), list)
-  const row = (key, value) => { if (value) list.append(el('dt', '', t(key)), el('dd', '', value)) }
+  const details = el('dl')
+  panel.append(el('h4', '', file.name), details)
+  const row = (key, value) => { if (value) details.append(el('dt', '', t(key)), el('dd', '', value)) }
 
   ;(async () => {
     const item = state.items.get(file.path) || file
@@ -1734,10 +1741,6 @@ function renderCrumbs() {
 }
 
 /*
- * When the path does not fit, intermediate folders collapse into a "…" button listing them,
- * like the macOS path bar: the drive and the last folders stay visible.
- */
-/*
  * Editable path: clicking the empty part of the breadcrumb bar or pressing Ctrl+L turns it into a
  * text field. Matching subfolders are suggested below; ↑↓ choose, Tab completes, Enter opens.
  */
@@ -1781,8 +1784,7 @@ function editPath() {
       suggestions = (data?.folders || []).filter(f => f.name.toLowerCase().startsWith(prefix)).sort(byName).slice(0, PATH_SUGGESTIONS)
     }
     if (!suggestions.length) { $('#menu').hidden = true; return }
-    const r = input.getBoundingClientRect()
-    showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 4 }, suggestions.map(f => ({ label: f.name, run: () => open(f.path) })))
+    menuBelow(input, suggestions.map(f => ({ label: f.name, run: () => open(f.path) })), 4)
   }
 
   input.addEventListener('input', suggest)
@@ -1807,6 +1809,10 @@ function editPath() {
   input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== input) close() }, 120))
 }
 
+/*
+ * When the path does not fit, intermediate folders collapse into a "…" button listing them,
+ * like the macOS path bar: the drive and the last folders stay visible.
+ */
 function fitCrumbs() {
   const crumbs = $('#crumbs')
   crumbs.querySelector('.crumb-more')?.nextElementSibling?.remove()
@@ -1822,10 +1828,9 @@ function fitCrumbs() {
     hidden.push(buttons[i])
   }
   if (!hidden.length) return
-  crumbs.querySelector('.crumb-more').onclick = e => {
-    const r = e.currentTarget.getBoundingClientRect()
-    showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 6 }, hidden.map(b => ({ label: b.textContent, run: () => b.click() })))
-  }
+  const more = crumbs.querySelector('.crumb-more')
+  more.title = hidden.map(b => b.textContent).join(' › ')
+  more.onclick = () => menuBelow(more, hidden.map(b => ({ label: b.textContent, run: () => b.click() })))
 }
 
 /* ========== navigation and tabs ========== */
@@ -2034,11 +2039,7 @@ const GROUP_OPTIONS = [['none', 'group.none'], ['day', 'group.day'], ['month', '
 // The leading icon replaces the label in narrow windows.
 function popupButton(button, options, current, pick, iconName) {
   button.replaceChildren(icon(iconName, 'lead'), el('span', '', t(options.find(([value]) => value === current)?.[1])), icon('chevronDown'))
-  button.onclick = () => {
-    const r = button.getBoundingClientRect()
-    showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 6 },
-      options.map(([value, label]) => ({ label: t(label), check: value === current, run: () => pick(value) })))
-  }
+  button.onclick = () => menuBelow(button, options.map(([value, label]) => ({ label: t(label), check: value === current, run: () => pick(value) })))
 }
 
 function renderControls() {
@@ -2119,7 +2120,7 @@ function bindEvents() {
     else if (e.key === 'ArrowRight') enterFocus()
     else if (e.key === 'ArrowLeft' || e.key === 'Backspace') goUp()
     else if (e.key === 'Enter') {
-      if (fileSelected) $('#content .item.sel')?.dispatchEvent(new MouseEvent('dblclick'))
+      if (fileSelected) $('#content .item.sel')?.open()
       else enterFocus()
     } else if (e.key === 'Delete' && selected.length) trashSelection()
     else if (e.key === 'F2' && selected.length) renameSelection()

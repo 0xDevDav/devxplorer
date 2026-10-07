@@ -1,28 +1,11 @@
 // Free-form labels on files and folders, with filter chips in the places bar.
-registerExtension(({ language, el, chip, compare, ask, setMeta, render }) => {
-  const STRINGS = {
-    en: {
-      name: 'Tags',
-      description: 'Free labels (#client, #summer…) on files and folders, with a filter in the top bar.',
-      add: 'Add tag…',
-      prompt: 'Tag name',
-      remove: 'Remove #{tag}',
-    },
-    it: {
-      name: 'Tag',
-      description: 'Etichette libere (#cliente, #estate…) su file e cartelle, con filtro nella barra in alto.',
-      add: 'Aggiungi tag…',
-      prompt: 'Nome del tag',
-      remove: 'Rimuovi #{tag}',
-    },
-  }
-  const text = STRINGS[language] || STRINGS.en
+registerExtension(({ t, el, chip, compare, ask, setMeta, render }) => {
   let filter = null
 
   return {
     id: 'tags',
-    name: text.name,
-    description: text.description,
+    name: t('ext.tags.name'),
+    description: t('ext.tags.description'),
 
     badges: m => (m.tags || []).map(tag => el('span', 'tag', '#' + tag)),
 
@@ -30,13 +13,13 @@ registerExtension(({ language, el, chip, compare, ask, setMeta, render }) => {
       const present = [...new Set(metas.flatMap(m => m.tags || []))]
       return [
         {
-          label: text.add,
+          label: t('ext.tags.add'),
           run: async () => {
-            const tag = (await ask(text.prompt))?.trim().replace(/^#/, '')
+            const tag = (await ask(t('ext.tags.prompt')))?.trim().replace(/^#/, '')
             if (tag) setMeta(paths, { add: tag })
           },
         },
-        ...present.map(tag => ({ label: text.remove.replace('{tag}', tag), run: () => setMeta(paths, { remove: tag }) })),
+        ...present.map(tag => ({ label: t('ext.tags.remove', { tag }), run: () => setMeta(paths, { remove: tag }) })),
       ]
     },
 

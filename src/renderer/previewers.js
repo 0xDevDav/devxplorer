@@ -6,7 +6,6 @@
 
 const PREVIEW_TEXT_LIMIT = 500000
 const PREVIEW_ROW_LIMIT = 5000
-const AUDIO_EXT = /^(mp3|wav|flac|m4a|aac|ogg|opus)$/
 const MARKUP_EXT = /^(html?|xhtml|xml|svg|vue)$/
 const CODE_ALIASES = { javascript: 'js', typescript: 'ts', python: 'py', shell: 'sh', bash: 'sh', powershell: 'ps1', yml: 'yaml' }
 const NUMERIC_CELL = /^[-+]?[\d.,' ]*\d[\d.,' ]*%?$/
