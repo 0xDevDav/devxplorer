@@ -18,7 +18,20 @@ const SYMBOLS = '#c9c9d4'
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|avif|heic)$/i
 const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v)$/i
-const HIDDEN = /^(\$|\.)|^(desktop\.ini|thumbs\.db|system volume information|config\.msi|recovery|pagefile\.sys|hiberfil\.sys|swapfile\.sys|dumpstack\.log(\.tmp)?)$/i
+const HIDDEN = /^(\$|\.)|^(desktop\.ini|thumbs\.db|system volume information|config\.msi|recovery|pagefile\.sys|hiberfil\.sys|swapfile\.sys|dumpstack\.log(\.tmp)?|nul)$/i
+/*
+ * Windows programs cannot create a file named "nul": it is the output of a "2>nul" redirection
+ * run in a Unix shell (Git Bash, WSL), so it is hidden and deleted. Larger files are left alone
+ * in case one was made on purpose.
+ */
+const STRAY_NUL = /^nul$/i
+const STRAY_NUL_MAX = 1024 * 1024
+
+async function removeStrayNul(p) {
+  const stat = await fsp.lstat(p).catch(() => null)
+  if (stat?.isFile() && stat.size <= STRAY_NUL_MAX) await fsp.unlink(p).catch(() => {})
+}
+
 const INVALID_NAME = /[<>:"/\\|?*]|[. ]$/
 const TRANSPARENT = '#00000000'
 // The Mica material needs Windows 11 22H2 (build 22621) or later.
@@ -147,6 +160,7 @@ const handlers = {
 
   async list(dir) {
     const names = await fsp.readdir(dir).catch(() => [])
+    names.filter(n => STRAY_NUL.test(n)).forEach(n => removeStrayNul(path.join(dir, n)))
     const items = (await Promise.all(names.filter(n => !HIDDEN.test(n)).map(n => describe(path.join(dir, n))))).filter(Boolean)
     return { folders: items.filter(i => i.isDir), files: items.filter(i => !i.isDir) }
   },
