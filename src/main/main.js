@@ -385,9 +385,11 @@ const handlers = {
 for (const [name, fn] of Object.entries(handlers)) ipcMain.handle(name, (e, ...args) => fn(...args))
 
 // A folder passed on the command line (e.g. from a shell "Open with" entry) wins over the last session.
+// Explorer passes a drive root as "C:\", whose \" Windows reads as an escaped quote: C:" comes
+// back to C:\.
 function folderArgument(argv) {
   const appPath = lower(app.getAppPath())
-  return argv.slice(1).find(a =>
+  return argv.slice(1).map(a => a.replace(/^([a-z]:)"\s*$/i, '$1\\')).find(a =>
     !a.startsWith('-') && a !== '.' && lower(path.resolve(a)) !== appPath &&
     fs.existsSync(a) && fs.statSync(a).isDirectory())
 }
