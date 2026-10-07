@@ -1360,12 +1360,9 @@ async function renameSelection() {
       if (samePath(paths[0], state.focus)) setFocus(joinPath(parentDir(paths[0]), name.trim()))
     }
   } else if (paths.length > 1) {
-    if (new Set(paths.map(p => parentDir(p).toLowerCase())).size > 1) {
-      return toast(t('rename.sameFolder'))
-    }
-    const label = await ask(t('rename.base', { n: paths.length }))
-    if (label === null) return
-    await renumber(paths, label.trim())
+    const pairs = await renameSheet(paths)
+    if (!pairs) return
+    await renameItems(pairs.filter(([p, name]) => name !== baseName(p)))
   }
   state.selection.clear()
   refresh()
@@ -1487,7 +1484,7 @@ function itemMenu(e) {
     single && { label: t('menu.reveal'), run: () => call('reveal', single) },
     isFolder && { label: isPinned(single) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(single) },
     '-',
-    { label: single ? t('menu.rename') : t('menu.number', { n: paths.length }), key: 'F2', run: renameSelection },
+    { label: single ? t('menu.rename') : t('menu.renameMany', { n: paths.length }), key: 'F2', run: renameSelection },
     { label: t('menu.copy'), key: 'Ctrl+C', run: () => copySelection(false) },
     { label: t('menu.cut'), key: 'Ctrl+X', run: () => copySelection(true) },
     { label: t('menu.duplicate'), key: 'Ctrl+D', run: duplicateSelection },
@@ -1503,6 +1500,66 @@ function itemMenu(e) {
 }
 
 /* ========== input dialog ========== */
+
+/*
+ * "Rename n items" sheet, like the Finder's: replace text, add text or a name with a counter,
+ * with the first new name previewed as the options change. Resolves to [[path, newName]] or null.
+ */
+const RENAME_MODES = ['replace', 'add', 'format']
+
+function renameSheet(paths) {
+  const sheet = $('#renameSheet')
+  const names = paths.map(baseName)
+  const options = { mode: 'replace', find: '', replace: '', text: '', where: 'after', name: '', start: 1 }
+  $('#renameTitle').textContent = t('rename.title', { n: paths.length })
+
+  const field = (label, key, type = 'text') => {
+    const input = Object.assign(el('input'), { value: options[key], spellcheck: false })
+    if (type === 'number') Object.assign(input, { type: 'number', min: 0 })
+    input.oninput = () => { options[key] = type === 'number' ? Math.max(0, parseInt(input.value, 10) || 0) : input.value; preview() }
+    const row = el('label', 'rename-field')
+    row.append(el('span', '', t(label)), input)
+    return row
+  }
+  const choice = (key, values) => {
+    const bar = el('div', 'segmented')
+    for (const [value, label] of values) {
+      const b = el('button', options[key] === value ? 'on' : '', t(label))
+      b.type = 'button'
+      b.onclick = () => { options[key] = value; render() }
+      bar.append(b)
+    }
+    return bar
+  }
+  const where = choice.bind(null, 'where')
+
+  function render() {
+    $('#renameMode').replaceChildren(choice('mode', RENAME_MODES.map(m => [m, 'rename.mode.' + m])))
+    const fields = {
+      replace: [field('rename.find', 'find'), field('rename.with', 'replace')],
+      add: [field('rename.text', 'text'), where([['before', 'rename.before'], ['after', 'rename.after']])],
+      format: [field('rename.name', 'name'), field('rename.start', 'start', 'number'), where([['after', 'rename.numberAfter'], ['before', 'rename.numberBefore']])],
+    }[options.mode]
+    $('#renameFields').replaceChildren(...fields)
+    preview()
+    $('#renameFields input')?.focus()
+  }
+  function preview() {
+    const result = batchNames(names, options)
+    const clash = new Set(result.map(n => n.toLowerCase())).size !== result.length
+    $('#renamePreview').textContent = clash ? t('error.duplicateNames') : t('rename.example', { name: result[0] })
+    $('#renamePreview').classList.toggle('error', clash)
+    sheet.querySelector('button[value="ok"]').disabled = clash
+  }
+
+  render()
+  sheet.returnValue = ''
+  sheet.showModal()
+  $('#renameFields input')?.focus()
+  return new Promise(resolve => {
+    sheet.onclose = () => resolve(sheet.returnValue === 'ok' ? paths.map((p, i) => [p, batchNames(names, options)[i]]) : null)
+  })
+}
 
 function ask(label, value = '', selectStem = false) {
   const dialog = $('#ask')

@@ -309,6 +309,19 @@ button:disabled { opacity: .5; cursor: default }
 .empty-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-soft) }
 .empty .hint { max-width: 380px }
 
+/* Rename sheet */
+#renameSheet { width: 420px }
+#renameSheet h3 { margin: 0 0 14px; font-size: 14px }
+#renameMode .segmented { display: flex; margin: 0 0 14px }
+#renameMode .segmented button { flex: 1 }
+#renameFields { display: flex; flex-direction: column; gap: 10px }
+#renameFields .segmented { margin: 0; align-self: flex-start }
+.rename-field { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 10px; margin: 0 }
+.rename-field span { color: var(--muted); text-align: right }
+.rename-field input[type="number"] { width: 90px; padding: 6px 8px; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm); outline: none }
+#renamePreview { margin: 14px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+#renamePreview.error { color: var(--status-drop) }
+
 /* Get Info sheet */
 #infoSheet { width: 380px }
 .info-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line) }

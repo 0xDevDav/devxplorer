@@ -62,6 +62,16 @@
     </form>
   </dialog>
 
+  <dialog id="renameSheet">
+    <form method="dialog">
+      <h3 id="renameTitle"></h3>
+      <div id="renameMode"></div>
+      <div id="renameFields"></div>
+      <p id="renamePreview" class="hint"></p>
+      <menu><button value="ok" class="primary" data-i18n="rename.apply"></button><button value="cancel" data-i18n="dialog.cancel"></button></menu>
+    </form>
+  </dialog>
+
   <dialog id="infoSheet">
     <form method="dialog">
       <div id="infoBody"></div>
@@ -140,6 +150,7 @@
   <div id="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="../shared/messages.js"></script>
+  <script src="../shared/rename.js"></script>
   <script src="app.js"></script>
   <script src="media-controls.js"></script>
   <script src="previewers.js"></script>
