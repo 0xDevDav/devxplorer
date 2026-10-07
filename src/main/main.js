@@ -345,6 +345,7 @@ app.whenReady().then(() => {
     height: 900,
     ...saved.bounds,
     title: app.getName(),
+    icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
     backgroundColor: appearance.glass ? TRANSPARENT : chrome.color,
     ...(appearance.glass && { backgroundMaterial: 'mica' }),
     titleBarStyle: 'hidden',

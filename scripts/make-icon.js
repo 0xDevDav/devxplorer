@@ -1,0 +1,27 @@
+/*
+ * Renders assets/icon.svg to assets/icon.png (1024x1024), the source electron-builder turns
+ * into the Windows .ico. Run with: npm run icon
+ */
+const { app, BrowserWindow } = require('electron')
+const fs = require('fs')
+const path = require('path')
+
+const SIZE = 1024
+const svg = fs.readFileSync(path.join(__dirname, '..', 'assets', 'icon.svg'), 'utf8')
+
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ show: false })
+  await win.loadURL('data:text/html,<canvas></canvas>')
+  const dataUrl = await win.webContents.executeJavaScript(`new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.querySelector('canvas')
+      canvas.width = canvas.height = ${SIZE}
+      canvas.getContext('2d').drawImage(img, 0, 0, ${SIZE}, ${SIZE})
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.src = 'data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}'
+  })`)
+  fs.writeFileSync(path.join(__dirname, '..', 'assets', 'icon.png'), Buffer.from(dataUrl.split(',')[1], 'base64'))
+  app.quit()
+})
