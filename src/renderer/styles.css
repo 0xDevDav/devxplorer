@@ -652,8 +652,9 @@ dialog .actions button:hover { border-color: var(--muted) }
 #settings { width: min(1040px, calc(100vw - 48px)); max-width: none; max-height: calc(100vh - 48px); padding: 22px 24px 20px; overflow: hidden }
 #settings form { display: flex; flex-direction: column; max-height: calc(100vh - 90px) }
 #settings h2 { margin: 0 0 16px; font-size: 20px }
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); align-items: start; gap: 14px; min-height: 0; overflow: auto }
-.settings-grid section { min-width: 0; padding: 16px; background: color-mix(in srgb, var(--bg) 45%, transparent); border: 1px solid var(--line); border-radius: 12px }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); align-items: start; gap: 24px 32px; min-height: 0; overflow: auto }
+.settings-grid section { min-width: 0 }
+#settings .ext-row { border-color: transparent }
 
 /* "Go to" palette, anchored near the top like Spotlight */
 #palette { width: min(640px, 90vw); margin-top: 12vh; padding: 0; overflow: hidden }
