@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "File manager with inline folder previews, ordering and pluggable workflow extensions",
   "author": "0xDevDav",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "main": "src/main/main.js",
   "scripts": {
