@@ -796,6 +796,7 @@ async function showPeek(dir, name) {
     : el('p', 'empty', 'Cartella vuota')
 
   const peek = $('#peek')
+  peek.classList.remove('expanding')
   peek.dataset.dir = dir
   peek.replaceChildren(head, body)
   const area = $('#main').getBoundingClientRect()
@@ -809,11 +810,21 @@ async function showPeek(dir, name) {
   $('#dim').classList.add('show')
 }
 
-function openPeekedFolder() {
+// The preview grows to fill the content area while the folder opens underneath, then fades out.
+const PEEK_EXPAND_MS = 280
+
+async function openPeekedFolder() {
   if (!peekOpen()) return
-  const dir = $('#peek').dataset.dir
-  hidePeek()
-  navigate(dir)
+  const peek = $('#peek')
+  clearTimeout(peekHideTimer)
+  peekToken++
+  const area = $('#main').getBoundingClientRect()
+  peek.classList.add('expanding')
+  Object.assign(peek.style, { left: area.left + 'px', top: area.top + 'px', width: area.width + 'px', height: area.height + 'px' })
+  $('#dim').classList.remove('show')
+  await Promise.all([navigate(peek.dataset.dir), new Promise(r => setTimeout(r, PEEK_EXPAND_MS))])
+  peek.classList.remove('show')
+  setTimeout(() => { if (!peekOpen()) peek.classList.remove('expanding') }, FADE_MS)
 }
 
 function hidePeek() {
@@ -875,7 +886,7 @@ function renderCrumbs() {
 function navigate(dir, focus = null) {
   Object.assign(currentTab(), { cwd: dir, focus })
   saveTabs()
-  showTab()
+  return showTab()
 }
 
 // Going up keeps the folder we came from focused, so the list does not lose its place.
@@ -892,7 +903,7 @@ function showTab() {
   state.selection.clear()
   $('#folders').scrollTop = 0
   call('watch', tab.cwd)
-  refresh()
+  return refresh()
 }
 
 function switchTab(i) {

@@ -323,6 +323,13 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   transition: opacity var(--normal) var(--ease), transform .26s var(--ease), visibility 0s var(--normal);
 }
 #peek.show { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; pointer-events: auto; cursor: pointer }
+/* opening the previewed folder: grow to the content area, then fade out over the opened view */
+#peek.expanding { transform: none; border-color: transparent; border-radius: 0; box-shadow: none }
+#peek.expanding.show {
+  transition: left .28s var(--ease), top .28s var(--ease), width .28s var(--ease), height .28s var(--ease),
+    border-radius .28s var(--ease), border-color .28s, box-shadow .28s;
+}
+#peek.expanding:not(.show) { transition: opacity var(--normal) ease, visibility 0s var(--normal) }
 /* fade out the last row instead of cutting it */
 #peek::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(transparent, var(--bg)) }
 .peek-head { display: flex; align-items: baseline; gap: 12px; margin: 0 4px 14px }
