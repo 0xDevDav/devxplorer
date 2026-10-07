@@ -101,13 +101,23 @@ let watchTimer = null
 const FOLDER_SIZE_TTL = 60000
 const folderSizes = new Map()
 
+// At most this many file system calls at once: sizing a whole drive must not flood the disk.
+const SIZE_CONCURRENCY = 32
+let sizeCalls = 0
+const sizeQueue = []
+async function throttled(fn) {
+  if (sizeCalls >= SIZE_CONCURRENCY) await new Promise(resolve => sizeQueue.push(resolve))
+  sizeCalls++
+  try { return await fn() } finally { sizeCalls--; sizeQueue.shift()?.() }
+}
+
 async function walkSize(dir) {
-  const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => [])
+  const entries = await throttled(() => fsp.readdir(dir, { withFileTypes: true })).catch(() => [])
   const sizes = await Promise.all(entries.map(async entry => {
     if (entry.isSymbolicLink()) return 0
     const p = path.join(dir, entry.name)
     if (entry.isDirectory()) return walkSize(p)
-    return (await fsp.stat(p).catch(() => null))?.size ?? 0
+    return (await throttled(() => fsp.stat(p)).catch(() => null))?.size ?? 0
   }))
   return sizes.reduce((sum, size) => sum + size, 0)
 }

@@ -1031,8 +1031,12 @@ async function renderStatus() {
   if (token === statusToken) left.textContent = [...parts, formatBytes(files + sizes.reduce((a, b) => a + (b || 0), 0))].join(' · ')
 }
 
+// Switching drives quickly must not let a slower, older answer win.
+let diskSpaceToken = 0
 async function renderDiskSpace() {
+  const token = ++diskSpaceToken
   const space = await call('diskSpace', state.cwd)
+  if (token !== diskSpaceToken) return
   $('#statusRight').textContent = space ? t('status.free', { size: formatBytes(space.free) }) : ''
 }
 
@@ -1867,7 +1871,9 @@ function paletteCandidates() {
 let paletteIndex = 0
 let paletteResults = []
 
+let paletteToken = 0
 async function renderPalette() {
+  const token = ++paletteToken
   const query = $('#paletteInput').value.trim().toLowerCase()
   let results = paletteCandidates()
   if (query) {
@@ -1882,6 +1888,7 @@ async function renderPalette() {
       results.unshift({ path: $('#paletteInput').value.trim(), kind: 'path', name: baseName($('#paletteInput').value.trim()) })
     }
   }
+  if (token !== paletteToken) return // a newer keystroke has taken over
   paletteResults = results.slice(0, PALETTE_LIMIT)
   paletteIndex = Math.min(paletteIndex, Math.max(0, paletteResults.length - 1))
   $('#paletteList').replaceChildren(...(paletteResults.length ? paletteResults.map((r, i) => {
