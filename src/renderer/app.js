@@ -252,7 +252,7 @@ async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
   countEl.textContent = filesOnly ? `${data.files.length} file` : countLabel(data)
   const files = sorted(data.files).slice(0, 4)
   if (files.length) collage.append(...files.map(previewImg))
-  else collage.classList.add('empty')
+  else collage.classList.add('no-files')
 }
 
 /* ========== main view: folder list + content pane ========== */
