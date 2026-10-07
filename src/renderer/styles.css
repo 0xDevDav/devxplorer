@@ -421,6 +421,21 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 /* ---------- full-screen viewer (always dark, like a photo viewer) ---------- */
 
 #viewer {
+  /* dark tokens regardless of the app theme */
+  --bg: #0d0d10;
+  --panel: #16161b;
+  --panel2: #1e1e25;
+  --line: #26262f;
+  --text: #ececf1;
+  --text-soft: #cfcfd8;
+  --muted: #8c8c99;
+  --faint: #5c5c68;
+  --col-0: #0a84ff;
+  --col-1: #30d158;
+  --col-2: #ff9f0a;
+  --col-3: #bf5af2;
+  --col-4: #ff375f;
+  --col-5: #64d2ff;
   position: fixed;
   inset: 0;
   z-index: 25;
@@ -429,35 +444,77 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   justify-content: center;
   padding: 20px 20px 64px;
   background: #000;
-  color: #ececf1;
+  color: var(--text);
+  color-scheme: dark;
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--normal) var(--ease), visibility 0s var(--normal);
 }
 #viewer.show { opacity: 1; visibility: visible; transition-delay: 0s }
 #viewer.show > :first-child { animation: zoom-in .24s var(--ease) }
-#viewer img, #viewer video { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: 8px }
+#viewer > img, #viewer > video { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: 8px }
 #viewer .doc { width: min(1100px, 100%); height: 100%; background: #fff; border: 0; border-radius: 8px }
-#viewer .textview {
-  width: min(1100px, 100%);
-  height: 100%;
-  margin: 0;
-  padding: 24px 28px;
-  overflow: auto;
-  background: #16161b;
-  border: 1px solid #26262f;
-  border-radius: 8px;
-  font: 13px/1.55 Consolas, monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-  user-select: text;
-}
 #viewer .other { display: flex; flex-direction: column; align-items: center; gap: 14px }
-
-#viewer .other .name { font-size: 15px; color: #ececf1 }
-#viewer .other button { padding: 8px 16px; border: 1px solid #26262f; border-radius: 8px; cursor: pointer }
+#viewer .other .name { font-size: 15px; color: var(--text) }
+#viewer .other button { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
 .viewer-bar { position: absolute; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; gap: 12px; color: #ddd }
-.viewer-bar .hint { margin-left: auto; color: #8c8c99 }
+.viewer-bar .hint { margin-left: auto; color: var(--muted) }
+
+/* image matte behind transparent pixels */
+#viewer.matte-light > img { background: #fff }
+#viewer.matte-checker > img { background: repeating-conic-gradient(#d4d4da 0 25%, #fff 0 50%) 50% / 20px 20px }
+.matte-switch { position: absolute; top: 52px; right: 20px; margin: 0; background: var(--panel) }
+.matte-switch button { padding: 6px 8px }
+.matte-sample { display: block; width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px #ffffff40 }
+[data-matte="dark"] .matte-sample { background: #000 }
+[data-matte="light"] .matte-sample { background: #fff }
+[data-matte="checker"] .matte-sample { background: repeating-conic-gradient(#c8c8ce 0 25%, #fff 0 50%) 50% / 8px 8px }
+
+/* rich previews: text, code, tables, markdown, html */
+.rich { display: flex; flex-direction: column; gap: 10px; width: min(1200px, 100%); height: 100%; min-height: 0 }
+.rich-switch { align-self: center; margin: 0 }
+.rich-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; user-select: text }
+.rich-caption { text-align: center; font-size: 12px; color: var(--muted) }
+
+.textview { margin: 0; padding: 24px 28px; font: 13px/1.6 Consolas, "Cascadia Mono", monospace; white-space: pre-wrap; word-break: break-word }
+
+.codeview { display: flex; min-width: 100%; width: max-content; min-height: 100%; font: 13px/1.6 Consolas, "Cascadia Mono", monospace }
+.codeview pre { margin: 0; padding: 16px 0 }
+.codeview .gutter { position: sticky; left: 0; padding: 16px 12px 16px 16px; text-align: right; color: var(--faint); background: var(--panel); border-right: 1px solid var(--line); user-select: none }
+.codeview .code { flex: 1; padding: 16px 24px; white-space: pre; tab-size: 4 }
+.tk-kw { color: #ff7ab2; font-weight: 600 }
+.tk-str { color: #ff8170 }
+.tk-num { color: #d9c97c }
+.tk-com { color: #7f8c98; font-style: italic }
+.tk-key, .tk-tag { color: #6bdfff }
+.tk-type { color: #dabaff }
+.tk-attr { color: #ffa14f }
+.tk-punct { color: var(--muted) }
+
+table.csv { min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px }
+table.csv th, table.csv td { max-width: 420px; padding: 6px 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; border-bottom: 1px solid var(--line) }
+table.csv thead th { position: sticky; top: 0; z-index: 1; color: var(--col, var(--text)); font-weight: 600; background: var(--panel2); box-shadow: inset 0 -2px var(--col, var(--line)) }
+table.csv tbody tr:nth-child(even) td { background: #ffffff05 }
+table.csv tbody tr:hover td { background: #ffffff0f }
+table.csv .num { text-align: right; font-variant-numeric: tabular-nums }
+table.csv .rownum { position: sticky; left: 0; color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; background: var(--panel) }
+table.csv thead .rownum { z-index: 2; background: var(--panel2) }
+
+.markdown { max-width: 780px; margin: 0 auto; padding: 36px 44px 60px; font-size: 15px; line-height: 1.7; color: var(--text-soft) }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { margin: 1.4em 0 .5em; line-height: 1.25; color: var(--text) }
+.markdown h1 { font-size: 30px } .markdown h2 { font-size: 23px } .markdown h3 { font-size: 18px }
+.markdown h1:first-child, .markdown h2:first-child { margin-top: 0 }
+.markdown code { padding: .1em .4em; font: .9em Consolas, monospace; background: #ffffff12; border-radius: 5px }
+.markdown pre.code { padding: 14px 18px; overflow: auto; font: 13px/1.6 Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px }
+.markdown blockquote { margin: 1em 0; padding: 2px 16px; color: var(--muted); border-left: 3px solid var(--accent) }
+.markdown hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0 }
+.markdown .md-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px }
+.markdown .md-image { font-style: italic; color: var(--muted) }
+.markdown .md-image::before { content: "▣ " }
+
+#viewer iframe.page { display: block; width: 100%; height: 100%; border: 0; background: #fff }
+.audioview { display: flex; flex-direction: column; align-items: center; gap: 24px }
+.audioview audio { width: min(460px, 80vw) }
 
 /* ---------- dialogs ---------- */
 

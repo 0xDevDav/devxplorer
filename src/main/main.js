@@ -121,13 +121,14 @@ const handlers = {
   },
 
   // Returns the file content when it looks like text (no NUL bytes), otherwise null.
+  // The byte order mark some Windows editors write is dropped so parsers see the first line intact.
   async readText(p, max = 4000) {
     let fh
     try {
       fh = await fsp.open(p)
       const { buffer, bytesRead } = await fh.read(Buffer.alloc(max), 0, max, 0)
       const bytes = buffer.subarray(0, bytesRead)
-      return bytes.includes(0) ? null : bytes.toString('utf8')
+      return bytes.includes(0) ? null : bytes.toString('utf8').replace(/^﻿/, '')
     } catch { return null } finally { await fh?.close() }
   },
 

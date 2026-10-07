@@ -891,20 +891,53 @@ function showViewer() {
     media = Object.assign(el('iframe', 'doc'), { src: fileUrl(file.path) })
   } else {
     media = el('div', 'other')
-    call('readText', file.path, 500000).then(async text => {
+    richPreview(file).then(preview => {
       if (!isCurrent()) return
-      if (text != null) return media.replaceWith(el('pre', 'textview', text))
+      if (preview?.bare) return media.replaceWith(preview.node)
+      if (preview) return media.replaceWith(richPreviewFrame(preview))
       const open = el('button', 'primary', 'Apri con il programma predefinito')
       open.onclick = () => call('open', file.path)
       media.append(docIcon(file.name, 'large'), el('div', 'name', file.name), open)
     })
   }
 
-  const hints = ['← → scorri', ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), 'Invio apri con programma', 'Spazio o Esc chiudi']
+  const transparent = TRANSPARENT_IMAGE.test(file.name)
+  const hints = ['← → scorri', ...(transparent ? ['B sfondo'] : []), ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), 'Invio apri con programma', 'Spazio o Esc chiudi']
   const bar = el('div', 'viewer-bar')
   bar.append(el('span', '', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
+  if (transparent) box.append(matteSwitch())
+  applyMatte()
   box.classList.add('show')
+}
+
+/* Images that may contain transparency can be shown on a dark, light or checkerboard matte. */
+const TRANSPARENT_IMAGE = /\.(png|webp|gif|svg|avif|ico|bmp)$/i
+const MATTES = [['dark', 'Sfondo scuro'], ['light', 'Sfondo chiaro'], ['checker', 'Scacchiera']]
+const currentMatte = () => MATTES.some(([m]) => m === localStorage.matte) ? localStorage.matte : 'dark'
+
+function applyMatte() {
+  const box = $('#viewer')
+  MATTES.forEach(([m]) => box.classList.toggle('matte-' + m, m === currentMatte()))
+  box.querySelectorAll('.matte-switch button').forEach(b => b.classList.toggle('on', b.dataset.matte === currentMatte()))
+}
+
+function setMatte(matte) {
+  localStorage.matte = matte
+  applyMatte()
+}
+
+function matteSwitch() {
+  const switcher = el('div', 'segmented matte-switch')
+  for (const [matte, label] of MATTES) {
+    const b = el('button')
+    b.dataset.matte = matte
+    b.title = label
+    b.append(el('span', 'matte-sample'))
+    b.onclick = () => setMatte(matte)
+    switcher.append(b)
+  }
+  return switcher
 }
 
 function viewerKey(e) {
@@ -918,6 +951,10 @@ function viewerKey(e) {
     closeViewer()
   }
   else if (e.key === 'Enter') call('open', file.path)
+  else if (e.key.toLowerCase() === 'b' && TRANSPARENT_IMAGE.test(file.name)) {
+    const i = MATTES.findIndex(([m]) => m === currentMatte())
+    setMatte(MATTES[(i + 1) % MATTES.length][0])
+  }
   else activeExtensions().some(x => x.viewer?.onKey?.(e, file.path))
 }
 
