@@ -514,6 +514,7 @@ function appIcon(path, src) {
 
 function previewImg(item) {
   const img = el('img')
+  img.alt = ''  // the item is named by its card
   img.draggable = false
   Object.assign(img.dataset, { src: item.path, mtime: item.mtime, type: item.type })
   previewObserver.observe(img)
@@ -785,6 +786,8 @@ function grid(folders, files, dir) {
   const displayOrder = groups.flatMap(g => g.files) // viewer navigation follows what is on screen
   const block = (items, folderItems = []) => {
     const node = el('div', 'grid')
+    node.setAttribute('role', 'listbox')
+    node.setAttribute('aria-multiselectable', 'true')
     folderItems.forEach(f => node.append(folderTile(f)))
     items.forEach(f => node.append(fileCard(f, displayOrder)))
     if (dir) dropTarget(node, dir)
@@ -975,6 +978,9 @@ const selectedInOrder = () => visiblePaths().filter(p => state.selection.has(p))
 
 function selectable(node, path, isFolder) {
   node.dataset.path = path
+  node.setAttribute('role', 'option')
+  node.setAttribute('aria-label', baseName(path))
+  node.setAttribute('aria-selected', 'false')
   if (isFolder) node.dataset.folder = ''
   node.draggable = true
   node.addEventListener('click', e => { e.stopPropagation(); select(path, e) })
@@ -1018,8 +1024,11 @@ function clearSelection() {
 function paintSelection() {
   const { byPath } = renderedItems()
   const cut = clipboard?.cut ? clipboard.paths : []
-  for (const node of $$('#main .sel, #main .cut')) node.classList.remove('sel', 'cut')
-  for (const p of state.selection) byPath.get(p)?.forEach(node => node.classList.add('sel'))
+  for (const node of $$('#main .sel, #main .cut')) {
+    node.classList.remove('sel', 'cut')
+    node.setAttribute('aria-selected', 'false')
+  }
+  for (const p of state.selection) byPath.get(p)?.forEach(node => { node.classList.add('sel'); node.setAttribute('aria-selected', 'true') })
   for (const p of cut) byPath.get(p)?.forEach(node => node.classList.add('cut'))
   renderStatus()
 }
@@ -1246,7 +1255,7 @@ function showMenu(e, items) {
       if (menu.lastChild && menu.lastChild.tagName !== 'HR') menu.append(el('hr'))
       continue
     }
-    const b = el('button', item.danger ? 'danger' : '')
+    const b = el('button')
     if (item.dot) b.append(el('i', 'dot ' + item.dot))
     b.append(el('span', '', item.label))
     if (item.check) b.append(icon('check', 'check'))
@@ -1310,7 +1319,7 @@ function itemMenu(e) {
     ext === 'zip' && { label: t('menu.extract'), run: () => createNear('extract', single) },
     ...activeExtensions().flatMap(x => x.menu ? ['-', ...x.menu(paths, metas)] : []),
     '-',
-    { label: t('menu.trash'), key: t('key.delete'), danger: true, run: trashSelection },
+    { label: t('menu.trash'), key: t('key.delete'), run: trashSelection },
   ])
 }
 
@@ -2273,6 +2282,7 @@ function bindTooltips() {
     const target = e.target.closest?.('[title], [data-tip]')
     if (!target) return
     if (target.hasAttribute('title')) {
+      if (!target.hasAttribute('aria-label')) target.setAttribute('aria-label', target.title)
       target.dataset.tip = target.title
       target.removeAttribute('title')
     }

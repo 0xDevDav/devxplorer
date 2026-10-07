@@ -27,7 +27,7 @@
   </nav>
 
   <main id="main">
-    <div id="folders" hidden></div>
+    <div id="folders" role="listbox" hidden></div>
     <div id="splitter" role="separator" aria-orientation="vertical"></div>
     <div id="content"></div>
   </main>
@@ -46,7 +46,7 @@
     </form>
   </dialog>
 
-  <dialog id="alert">
+  <dialog id="alert" role="alertdialog" aria-describedby="alertText">
     <form method="dialog">
       <img class="alert-icon" src="../../assets/icon.png" alt="">
       <p id="alertText"></p>
@@ -122,7 +122,7 @@
     </form>
   </dialog>
 
-  <div id="toast" hidden></div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="../shared/messages.js"></script>
   <script src="app.js"></script>

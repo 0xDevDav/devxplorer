@@ -21,9 +21,11 @@ function mediaControls(media, { overlay = false, signal } = {}) {
   const paint = () => {
     play.replaceChildren(icon(media.paused ? 'play' : 'pause'))
     play.dataset.tip = t(media.paused ? 'media.play' : 'media.pause')
+    play.setAttribute('aria-label', play.dataset.tip)
     const silent = media.muted || media.volume === 0
     mute.replaceChildren(icon(silent ? 'speakerOff' : 'speaker'))
     mute.dataset.tip = t(silent ? 'media.unmute' : 'media.mute')
+    mute.setAttribute('aria-label', mute.dataset.tip)
     const ratio = media.duration ? media.currentTime / media.duration : 0
     fill.style.width = ratio * 100 + '%'
     knob.style.left = ratio * 100 + '%'

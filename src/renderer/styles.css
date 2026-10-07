@@ -12,7 +12,6 @@
 
   --accent: #8b7bff;
   --accent-2: #ff7ab6;
-  --danger: #f87171;
   --on-accent: #fff;
 
   --status-todo: #f5b041;
@@ -43,7 +42,6 @@
   --backdrop: #0009;
   --placeholder: #3a3a46;
   --switch-off: #33333d;
-  --toast-bg: #2a1c1f;
   --overlay-symbols: #c9c9d4;
   --c-blue: #0a84ff;
   --c-green: #30d158;
@@ -79,7 +77,6 @@
   --backdrop: #1b1b2266;
   --placeholder: #d3d3dc;
   --switch-off: #d0d0d9;
-  --toast-bg: #fff1f1;
   --overlay-symbols: #3a3a44;
   --c-blue: #007aff;
   --c-green: #28a745;
@@ -141,7 +138,9 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 ::-webkit-scrollbar-thumb:hover { background-color: var(--muted) }
 
 .hint { margin: 0; font-size: 12px; color: var(--muted) }
-.primary { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--on-accent) !important }
+.primary, dialog menu button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent) }
+button:active:not(:disabled) { filter: brightness(.9) }
+button:disabled { opacity: .5; cursor: default }
 
 /* Windows 11 Mica shows through the window chrome; the content area stays opaque for legibility. */
 :root.glass body { background: transparent }
@@ -464,10 +463,8 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 #menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px; background: none; border: 0; border-radius: var(--r-sm); text-align: left; cursor: default; transition: none }
 #menu button:hover, #menu button.active { background: var(--accent); color: var(--on-accent) }
 #menu button:hover kbd { color: var(--on-accent); opacity: .75 }
-#menu button.danger:hover { background: var(--danger); color: #fff }
 #menu span { flex: 1 }
-#menu kbd { font: 11px inherit; color: var(--muted) }
-#menu .danger { color: var(--danger) }
+#menu kbd { font-family: inherit; font-size: 11px; color: var(--muted) }
 #menu hr { margin: 4px 2px; border: 0; border-top: 1px solid var(--line) }
 .dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50% }
 
@@ -685,8 +682,9 @@ dialog menu button { padding: 6px 14px; background: var(--panel2); border: 1px s
 .set-row + .set-row { border-top: 1px solid var(--line) }
 .set-row > div:first-child { flex: 1; min-width: 0 }
 .set-row .hint { margin-top: 2px }
-label.set-row { cursor: pointer }
-.set-row input[type="checkbox"] { display: none }
+label.set-row { position: relative; cursor: pointer }
+/* The checkbox stays in the tab order (Space toggles it); the switch next to it shows its state */
+.set-row input[type="checkbox"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
 .set-row .segmented { flex: none; margin: 0 }
 .set-row .swatches { margin: 0; padding: 4px }
 .set-actions { display: flex; flex: none; gap: 8px }
@@ -732,14 +730,14 @@ label.set-row { cursor: pointer }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; transition: transform var(--normal) var(--ease) }
 input:checked + .switch { background: var(--accent) }
 input:checked + .switch::after { transform: translateX(16px) }
+input:focus-visible + .switch { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 2px }
 
 /* macOS-style tooltip bubble, shown near the pointer */
 #tooltip { position: fixed; z-index: 50; max-width: 380px; padding: 5px 9px; font-size: 12px; line-height: 1.4; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; background: var(--surface); backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: 0 6px 22px #0006; pointer-events: none; opacity: 0; transform: translateY(-3px); transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease) }
 #tooltip.show { opacity: 1; transform: none }
 
-#toast { position: fixed; z-index: 30; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 16px; background: var(--toast-bg); border: 1px solid var(--danger); border-radius: var(--r-md); box-shadow: var(--shadow) }
+#toast { position: fixed; z-index: 30; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 16px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--r-md); box-shadow: var(--shadow) }
 #toast:not([hidden]) { animation: rise-in var(--normal) var(--ease) }
-#toast.info { background: var(--panel); border-color: var(--line-strong) }
 
 /* ---------- Social extension ---------- */
 
