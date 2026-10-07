@@ -1292,16 +1292,18 @@ function placeButton(dir, name, kind) {
   return b
 }
 
+// System places (Desktop, Pictures…) are shown with their localized name and icon.
+const placeKind = dir => state.places.find(p => samePath(p.path, dir))?.kind || 'folder'
+const placeLabel = dir => placeKind(dir) === 'folder' ? baseName(dir) || dir : t('place.' + placeKind(dir))
+
 function renderPlaces() {
   // System places keep their canonical order; folders pinned by the user follow in pin order.
   const rank = pin => {
     const i = state.places.findIndex(p => samePath(p.path, pin.path))
     return i < 0 ? state.places.length : i
   }
-  const kindOf = pin => state.places[rank(pin)]?.kind || 'folder'
   const ordered = [...pins].sort((a, b) => rank(a) - rank(b))
-  const nameOf = pin => kindOf(pin) === 'folder' ? pin.name : t('place.' + kindOf(pin))
-  $('#favs').replaceChildren(...ordered.map(p => placeButton(p.path, nameOf(p), kindOf(p))))
+  $('#favs').replaceChildren(...ordered.map(p => placeButton(p.path, placeLabel(p.path), placeKind(p.path))))
   $('#drives').replaceChildren(...state.drives.map(d => placeButton(d, d.slice(0, 2), 'drive')))
 }
 
@@ -1376,8 +1378,139 @@ function showTab() {
   extensions.forEach(x => x.filter?.reset())
   state.selection.clear()
   $('#folders').scrollTop = 0
+  rememberRecent(tab.cwd)
   call('watch', tab.cwd)
   return refresh()
+}
+
+/* ========== quick navigation: "Go to" palette (Ctrl+K / Ctrl+L) and type-to-select ========== */
+
+const RECENT_LIMIT = 30
+const PALETTE_LIMIT = 12
+let recent = store.get('recent', [])
+
+function rememberRecent(dir) {
+  recent = [dir, ...recent.filter(p => !samePath(p, dir))].slice(0, RECENT_LIMIT)
+  store.set('recent', recent)
+}
+
+// Subsequence match ("ncar" finds "Noemi Social\Caroselli"); consecutive and word-start hits score higher.
+function fuzzyScore(query, text) {
+  let from = 0
+  let last = -2
+  let score = 0
+  for (const ch of query) {
+    const i = text.indexOf(ch, from)
+    if (i < 0) return -1
+    score += i === last + 1 ? 3 : i === 0 || /[\\\s._-]/.test(text[i - 1]) ? 2 : 1
+    last = i
+    from = i + 1
+  }
+  return score - text.length / 100
+}
+
+function paletteCandidates() {
+  const seen = new Set()
+  const out = []
+  const add = (path, kind) => {
+    const key = path.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push({ path, kind, name: placeLabel(path) })
+  }
+  tabs.forEach(tab => add(tab.cwd, 'tab'))
+  pins.forEach(pin => add(pin.path, 'favorite'))
+  recent.forEach(p => add(p, 'recent'))
+  for (const item of state.items.values()) if (item.isDir && samePath(parentDir(item.path), state.cwd)) add(item.path, 'subfolder')
+  state.drives.forEach(d => add(d, 'drive'))
+  return out
+}
+
+let paletteIndex = 0
+let paletteResults = []
+
+async function renderPalette() {
+  const query = $('#paletteInput').value.trim().toLowerCase()
+  let results = paletteCandidates()
+  if (query) {
+    // Names only, unless the query contains a backslash: matching whole paths makes short queries noisy.
+    const field = query.includes('\\') ? 'path' : 'name'
+    results = results
+      .map(c => ({ ...c, score: fuzzyScore(query, c[field].toLowerCase()) }))
+      .filter(c => c.score >= 0)
+      .sort((a, b) => b.score - a.score)
+    // a typed path that exists is offered first
+    if (/^[a-z]:\\/i.test(query) && (await call('items', [$('#paletteInput').value.trim()]))?.[0]?.isDir) {
+      results.unshift({ path: $('#paletteInput').value.trim(), kind: 'path', name: baseName($('#paletteInput').value.trim()) })
+    }
+  }
+  paletteResults = results.slice(0, PALETTE_LIMIT)
+  paletteIndex = Math.min(paletteIndex, Math.max(0, paletteResults.length - 1))
+  $('#paletteList').replaceChildren(...(paletteResults.length ? paletteResults.map((r, i) => {
+    const row = el('div', 'palette-row' + (i === paletteIndex ? ' on' : ''))
+    const text = el('div', 'palette-text')
+    text.append(el('b', '', r.name), el('small', '', r.path))
+    row.append(icon(r.kind === 'drive' ? 'drive' : 'folder'), text, el('span', 'palette-kind', t('palette.' + r.kind)))
+    row.onmousemove = () => { if (paletteIndex !== i) { paletteIndex = i; paintPalette() } }
+    row.onclick = e => openPaletteResult(e.ctrlKey)
+    return row
+  }) : [el('p', 'hint', t('palette.none'))]))
+}
+
+function paintPalette() {
+  $$('#paletteList .palette-row').forEach((row, i) => row.classList.toggle('on', i === paletteIndex))
+  $$('#paletteList .palette-row')[paletteIndex]?.scrollIntoView({ block: 'nearest' })
+}
+
+function openPalette(prefill = '') {
+  const dialog = $('#palette')
+  $('#paletteInput').value = prefill
+  paletteIndex = 0
+  renderPalette()
+  dialog.showModal()
+  $('#paletteInput').select()
+}
+
+function openPaletteResult(newTabToo) {
+  const result = paletteResults[paletteIndex]
+  if (!result) return
+  $('#palette').close()
+  newTabToo ? newTab(result.path) : navigate(result.path)
+}
+
+function bindPalette() {
+  const input = $('#paletteInput')
+  input.addEventListener('input', () => { paletteIndex = 0; renderPalette() })
+  input.addEventListener('keydown', e => {
+    const step = { ArrowDown: 1, ArrowUp: -1 }[e.key]
+    if (step) {
+      e.preventDefault()
+      paletteIndex = (paletteIndex + step + paletteResults.length) % Math.max(1, paletteResults.length)
+      paintPalette()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      openPaletteResult(e.ctrlKey)
+    }
+  })
+  $('#palette').addEventListener('click', e => { if (e.target.id === 'palette') $('#palette').close() })
+}
+
+// Typing a name selects the first visible item that starts with it, as in the Finder.
+let typed = ''
+let typedTimer = null
+function typeToSelect(char) {
+  typed += char.toLowerCase()
+  clearTimeout(typedTimer)
+  typedTimer = setTimeout(() => { typed = '' }, 900)
+  const nameOf = node => (node.entry?.name ?? baseName(node.dataset.path)).toLowerCase()
+  const content = $$('#content [data-path]').filter(isShown).find(n => nameOf(n).startsWith(typed))
+  if (content) {
+    select(content.dataset.path, {})
+    content.scrollIntoView({ block: 'nearest' })
+    return
+  }
+  const row = $$('#folders .frow').find(r => r.entry.name.toLowerCase().startsWith(typed))
+  if (row) focusEntry(row.entry)
 }
 
 function switchTab(i) {
@@ -1481,6 +1614,8 @@ function bindEvents() {
       return $('#content .item.sel:not(.folder)')?.preview()
     }
 
+    if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); return openPalette() }
+    if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); return openPalette(state.cwd) }
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
     if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); return closeTab(tabIndex) }
     if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); return switchTab(tabIndex + (e.shiftKey ? -1 : 1)) }
@@ -1500,6 +1635,7 @@ function bindEvents() {
       $$('#content [data-path]').filter(isShown).forEach(n => state.selection.add(n.dataset.path))
       paintSelection()
     } else if (e.key === 'Escape') clearSelection()
+    else if (e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.altKey && !e.metaKey) typeToSelect(e.key)
   })
 
   $('#askInput').addEventListener('keydown', e => {
@@ -1528,6 +1664,7 @@ function bindEvents() {
   // Ctrl + wheel resizes the section under the pointer instead of zooming the whole window.
   document.addEventListener('pointerover', e => { pointerSection = sectionOf(e.target) })
   bindViewerZoom()
+  bindPalette()
   document.addEventListener('wheel', e => {
     if (!e.ctrlKey || viewerOpen()) return
     e.preventDefault()

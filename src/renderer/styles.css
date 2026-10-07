@@ -565,6 +565,22 @@ dialog .actions button:hover { border-color: var(--muted) }
 
 #settings { width: 520px }
 
+/* "Go to" palette, anchored near the top like Spotlight */
+#palette { width: min(640px, 90vw); margin-top: 12vh; padding: 0; overflow: hidden }
+.palette-box { display: flex; flex-direction: column }
+#paletteInput { width: 100%; padding: 16px 20px; font-size: 17px; background: none; border: 0; border-bottom: 1px solid var(--line); outline: none }
+#paletteList { max-height: 420px; padding: 6px; overflow: auto }
+#paletteList > .hint { padding: 14px }
+.palette-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; cursor: default }
+.palette-row .icon { width: 20px; height: 20px; color: var(--folder) }
+.palette-row.on { background: var(--accent); color: var(--on-accent) }
+.palette-row.on .icon, .palette-row.on small, .palette-row.on .palette-kind { color: var(--on-accent) }
+.palette-text { display: flex; flex-direction: column; flex: 1; min-width: 0 }
+.palette-text b, .palette-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.palette-text small { color: var(--muted) }
+.palette-kind { font-size: 11px; color: var(--muted) }
+.palette-hint { padding: 10px 20px; border-top: 1px solid var(--line) }
+
 .swatches { display: flex; gap: 10px; margin-top: 14px }
 .glass-row { margin-top: 14px }
 .swatch { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--swatch); cursor: pointer; box-shadow: inset 0 0 0 1px #00000026; transition: transform var(--fast) var(--ease), box-shadow var(--fast) }

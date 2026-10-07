@@ -100,6 +100,16 @@ const MESSAGES = {
     'menu.duplicate': 'Duplicate',
     'key.delete': 'Del',
 
+    'palette.placeholder': 'Go to folder…',
+    'palette.hint': '↑↓ choose · Enter open · Ctrl+Enter new tab · Esc close',
+    'palette.none': 'No folder found',
+    'palette.tab': 'Tab',
+    'palette.favorite': 'Favorite',
+    'palette.recent': 'Recent',
+    'palette.subfolder': 'Subfolder',
+    'palette.drive': 'Drive',
+    'palette.path': 'Path',
+
     'undo.nothing': 'Nothing to undo',
     'undo.done': 'Undone: {action}',
     'action.move': 'move',
@@ -241,6 +251,16 @@ const MESSAGES = {
     'menu.paste': 'Incolla',
     'menu.duplicate': 'Duplica',
     'key.delete': 'Canc',
+
+    'palette.placeholder': 'Vai alla cartella…',
+    'palette.hint': '↑↓ scegli · Invio apri · Ctrl+Invio nuova scheda · Esc chiudi',
+    'palette.none': 'Nessuna cartella trovata',
+    'palette.tab': 'Scheda',
+    'palette.favorite': 'Preferito',
+    'palette.recent': 'Recente',
+    'palette.subfolder': 'Sottocartella',
+    'palette.drive': 'Disco',
+    'palette.path': 'Percorso',
 
     'undo.nothing': 'Niente da annullare',
     'undo.done': 'Annullato: {action}',
