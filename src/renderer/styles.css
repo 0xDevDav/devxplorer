@@ -461,7 +461,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px 20px 64px;
+  padding: 56px 20px 20px; /* 40px bar on top, under the window controls */
   background: #000;
   color: var(--text);
   color-scheme: dark;
@@ -476,10 +476,29 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 #viewer .other { display: flex; flex-direction: column; align-items: center; gap: 14px }
 #viewer .other .name { font-size: 15px; color: var(--text) }
 #viewer .other button { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
-/* the gradient keeps the bar readable over a zoomed image */
-.viewer-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 28px 20px 18px; color: #ddd; background: linear-gradient(transparent, #000000c0); pointer-events: none }
-.viewer-bar > * { pointer-events: auto }
-.viewer-bar .hint { margin-left: auto; color: var(--muted) }
+/*
+ * The bar sits in the 40px band under the native window controls, like a title bar: it can drag
+ * the window, stays above a zoomed image and leaves room on the right for the controls.
+ */
+.viewer-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 150px 0 20px;
+  color: #ddd;
+  background: #000;
+  border-bottom: 1px solid #ffffff12;
+  -webkit-app-region: drag;
+}
+.viewer-bar > * { -webkit-app-region: no-drag }
+.viewer-bar > span:first-child { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600 }
+.viewer-bar .hint { flex: 1 1 0; min-width: 0; margin-left: auto; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; color: var(--muted) }
 
 /* image matte behind transparent pixels */
 #viewer.matte-light > img { background: #fff }
@@ -488,14 +507,14 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 #viewer > img.zoomed { cursor: grab }
 #viewer > img.dragging { cursor: grabbing; transition: none }
 
-.matte-switch { position: absolute; top: 52px; left: 20px; margin: 0; background: var(--panel) }
+.matte-switch { position: absolute; top: 56px; left: 20px; margin: 0; background: var(--panel) }
 
 .info-panel {
   position: absolute;
-  top: 52px;
+  top: 56px;
   right: 20px;
   width: 290px;
-  max-height: calc(100% - 140px);
+  max-height: calc(100% - 80px);
   overflow: auto;
   padding: 16px 18px;
   font-size: 12.5px;
