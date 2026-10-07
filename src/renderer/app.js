@@ -153,9 +153,11 @@ const extensions = []
 const enabledExtensions = store.get('ext', {})
 const activeExtensions = () => extensions.filter(x => enabledExtensions[x.id] ?? x.enabledByDefault ?? true)
 
-function chip(on, children, onclick) {
+// Filter item in the places bar, styled like a Finder tag; count goes in the tooltip.
+function chip(on, children, onclick, count) {
   const b = el('button', 'chip' + (on ? ' on' : ''))
   b.append(...children)
+  if (count != null) b.title = `${count} element${count === 1 ? 'o' : 'i'}`
   b.onclick = onclick
   return b
 }
@@ -943,12 +945,11 @@ function renderPlaces() {
 
 function renderExtensionFilters() {
   const all = state.allMeta
-  $('#extfilters').replaceChildren(...activeExtensions().filter(x => x.chips).flatMap(x => {
-    const chips = x.chips(all)
-    if (!chips.length) return []
+  const groups = activeExtensions().filter(x => x.chips).map(x => x.chips(all)).filter(chips => chips.length)
+  $('#extfilters').replaceChildren(...groups.flatMap((chips, i) => {
     const group = el('div', 'filter-group')
-    group.append(el('span', 'filter-label', x.name), ...chips)
-    return [group]
+    group.append(...chips)
+    return i ? [el('span', 'divider'), group] : [group]
   }))
 }
 

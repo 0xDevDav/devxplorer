@@ -25,8 +25,9 @@ registerExtension(({ el, chip, setMeta, render, refreshViewer }) => {
 
     chips: all => Object.entries(STATUSES).map(([key, label]) => chip(
       filter === key,
-      [el('i', 'dot ' + key), el('span', '', label), el('small', '', all.filter(m => m.status === key).length)],
+      [el('i', 'dot ' + key), el('span', '', label)],
       () => { filter = filter === key ? null : key; render() },
+      all.filter(m => m.status === key).length,
     )),
 
     filter: {
