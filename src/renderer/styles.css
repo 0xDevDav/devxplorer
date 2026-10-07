@@ -505,9 +505,6 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 }
 .viewer-bar > * { -webkit-app-region: no-drag }
 .viewer-title { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600 }
-.viewer-close { flex: none; display: grid; place-items: center; width: 26px; height: 26px; margin-left: -6px; padding: 0; color: #fff; background: #ffffff1f; border: 0; border-radius: 50%; cursor: pointer; transition: background-color var(--fast) }
-.viewer-close:hover { background: var(--danger) }
-.viewer-close .icon { width: 13px; height: 13px }
 .viewer-bar .hint { flex: 1 1 0; min-width: 0; margin-left: auto; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; color: var(--muted) }
 
 /* image matte behind transparent pixels */

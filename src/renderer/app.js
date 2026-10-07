@@ -1192,11 +1192,7 @@ function showViewer() {
     t('viewer.hint.close'),
   ]
   const bar = el('div', 'viewer-bar')
-  const close = el('button', 'viewer-close')
-  close.title = t('viewer.close')
-  close.append(icon('close'))
-  close.onclick = closeViewer
-  bar.append(close, el('span', 'viewer-title', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
+  bar.append(el('span', 'viewer-title', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
   if (transparent) box.append(matteSwitch())
   if (infoOpen()) box.append(infoPanel(file, media))

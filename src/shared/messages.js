@@ -131,7 +131,6 @@ const MESSAGES = {
     'tab.new': 'New tab (Ctrl+T)',
 
     'viewer.openWith': 'Open with default program',
-    'viewer.close': 'Close preview (Esc)',
     'viewer.hint.browse': '← → browse',
     'viewer.hint.matte': 'B background',
     'viewer.hint.zoom': 'wheel zoom',
@@ -294,7 +293,6 @@ const MESSAGES = {
     'tab.new': 'Nuova scheda (Ctrl+T)',
 
     'viewer.openWith': 'Apri con il programma predefinito',
-    'viewer.close': 'Chiudi anteprima (Esc)',
     'viewer.hint.browse': '← → scorri',
     'viewer.hint.matte': 'B sfondo',
     'viewer.hint.zoom': 'rotella zoom',
