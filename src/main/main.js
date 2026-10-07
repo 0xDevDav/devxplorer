@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, shell, nativeImage, Menu, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, nativeImage, nativeTheme, Menu, dialog } = require('electron')
 const fs = require('fs')
+const os = require('os')
 const fsp = fs.promises
 const path = require('path')
 const library = require('./library')
@@ -14,6 +15,9 @@ const VIDEO_EXT = /\.(mp4|mov|webm|mkv|avi|m4v)$/i
 const HIDDEN = /^(\$|\.)|^(desktop\.ini|thumbs\.db|system volume information|config\.msi|recovery|pagefile\.sys|hiberfil\.sys|swapfile\.sys|dumpstack\.log(\.tmp)?)$/i
 const INVALID_NAME = /[<>:"/\\|?*]|[. ]$/
 const LIBRARY_FILTER = [{ name: 'Libreria Explorer', extensions: ['db'] }]
+const TRANSPARENT = '#00000000'
+// The Mica material needs Windows 11 22H2 (build 22621) or later.
+const SUPPORTS_MICA = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621
 
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return fallback }
@@ -56,11 +60,13 @@ async function describe(p) {
 
 let win = null
 let chrome = null
+let appearance = null
 let watcher = null
 let watchTimer = null
 
 const handlers = {
   init: () => ({
+    supportsGlass: SUPPORTS_MICA,
     start: startFolder(),
     places: [['Desktop', 'desktop'], ['Immagini', 'pictures'], ['Video', 'videos'], ['Documenti', 'documents'], ['Download', 'downloads']]
       .map(([name, key]) => ({ name, path: app.getPath(key), kind: key })),
@@ -132,6 +138,15 @@ const handlers = {
   overlay({ color, symbolColor, remember }) {
     win.setTitleBarOverlay({ color, symbolColor })
     if (remember) chrome = { color, symbolColor }
+  },
+
+  // Keeps system-drawn surfaces (Mica, native dialogs) in the app's theme and toggles the glass material.
+  appearance({ theme, glass }) {
+    appearance = { theme, glass: SUPPORTS_MICA && glass }
+    nativeTheme.themeSource = theme
+    if (!SUPPORTS_MICA) return
+    if (appearance.glass) win.setBackgroundColor(TRANSPARENT)
+    win.setBackgroundMaterial(appearance.glass ? 'mica' : 'none')
   },
 
   open: p => shell.openPath(p),
@@ -214,12 +229,15 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
   const saved = readJson(WINDOW_FILE, {})
   chrome = saved.chrome ?? { color: BG, symbolColor: SYMBOLS }
+  appearance = saved.appearance ?? { theme: 'system', glass: SUPPORTS_MICA }
+  nativeTheme.themeSource = appearance.theme
   win = new BrowserWindow({
     width: 1400,
     height: 900,
     ...saved.bounds,
     title: app.getName(),
-    backgroundColor: chrome.color,
+    backgroundColor: appearance.glass ? TRANSPARENT : chrome.color,
+    ...(appearance.glass && { backgroundMaterial: 'mica' }),
     titleBarStyle: 'hidden',
     titleBarOverlay: { ...chrome, height: 40 },
     webPreferences: {
@@ -228,7 +246,7 @@ app.whenReady().then(() => {
     },
   })
   if (saved.maximized) win.maximize()
-  win.on('close', () => writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome }))
+  win.on('close', () => writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome, appearance }))
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
 })
 

@@ -207,13 +207,19 @@ const ACCENTS = [
 const currentAccent = () => ACCENTS.find(a => a[0] === localStorage.accent) || ACCENTS[0]
 const resolvedTheme = () => themePreference() === 'system' ? (systemDark.matches ? 'dark' : 'light') : themePreference()
 
+const glassOn = () => state.supportsGlass && localStorage.glass !== 'false'
+
 function applyTheme() {
   const root = document.documentElement
   const theme = resolvedTheme()
   const [, , dark, light, onAccent] = currentAccent()
   root.dataset.theme = theme
+  root.classList.toggle('glass', glassOn())
   root.style.setProperty('--accent', theme === 'dark' ? dark : light)
   root.style.setProperty('--on-accent', onAccent)
+  // Window-level appearance waits for init, which tells whether the glass material is available.
+  if (state.supportsGlass === undefined) return
+  call('appearance', { theme: themePreference(), glass: glassOn() })
   if (!viewerOpen()) syncWindowControls()
 }
 
@@ -237,7 +243,7 @@ function renderAccentPicker() {
 function syncWindowControls() {
   const css = getComputedStyle(document.documentElement)
   call('overlay', {
-    color: css.getPropertyValue('--bg').trim(),
+    color: glassOn() ? '#00000000' : css.getPropertyValue('--bg').trim(),
     symbolColor: css.getPropertyValue('--overlay-symbols').trim(),
     remember: true,
   })
@@ -262,6 +268,8 @@ function renderThemePicker() {
 function openSettings() {
   renderThemePicker()
   renderAccentPicker()
+  $('#glassRow').hidden = !state.supportsGlass
+  $('#glassToggle').checked = glassOn()
   $('#extList').replaceChildren(...extensions.map(x => {
     const row = el('label', 'ext-row')
     const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
@@ -883,7 +891,7 @@ function showViewer() {
     })
   }
 
-  const hints = ['← → scorri', ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), 'Invio apri con programma', 'Esc chiudi']
+  const hints = ['← → scorri', ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), 'Invio apri con programma', 'Spazio o Esc chiudi']
   const bar = el('div', 'viewer-bar')
   bar.append(el('span', '', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
@@ -896,7 +904,10 @@ function viewerKey(e) {
   if (step) {
     viewer.index = (viewer.index + step + viewer.items.length) % viewer.items.length
     showViewer()
-  } else if (e.key === 'Escape') closeViewer()
+  } else if (e.key === 'Escape' || e.key === ' ') {
+    e.preventDefault()
+    closeViewer()
+  }
   else if (e.key === 'Enter') call('open', file.path)
   else activeExtensions().some(x => x.viewer?.onKey?.(e, file.path))
 }
@@ -1092,6 +1103,10 @@ function bindEvents() {
     }
     if (e.target.closest?.('input, select')) return
     if (viewerOpen()) return viewerKey(e)
+    if (e.key === ' ') {
+      e.preventDefault()
+      return $('#content .item.sel:not(.folder)')?.dispatchEvent(new MouseEvent('dblclick'))
+    }
 
     if (e.ctrlKey && e.key.toLowerCase() === 't') { e.preventDefault(); return newTab(state.cwd) }
     if (e.ctrlKey && e.key.toLowerCase() === 'w') { e.preventDefault(); return closeTab(tabIndex) }
@@ -1120,6 +1135,10 @@ function bindEvents() {
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
   $('#settingsBtn').replaceChildren(icon('gear'))
   $('#settingsBtn').onclick = openSettings
+  $('#glassToggle').onchange = e => {
+    localStorage.glass = e.target.checked
+    applyTheme()
+  }
   $('#exportBtn').onclick = exportLibrary
   $('#importBtn').onclick = importLibrary
   $('.search').prepend(icon('search'))
@@ -1180,7 +1199,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyTheme()
   bindEvents()
   const init = await call('init')
-  Object.assign(state, { places: init.places, drives: init.drives })
+  Object.assign(state, { places: init.places, drives: init.drives, supportsGlass: init.supportsGlass })
+  applyTheme()
   pins ??= init.places
   renderControls()
   applySizes()
