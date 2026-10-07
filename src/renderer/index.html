@@ -14,15 +14,9 @@
 
   <div id="toolbar">
     <nav id="crumbs"></nav>
-    <input id="q" type="search" placeholder="Cerca…">
-    <select id="sort" title="Ordina"><option value="name">Nome</option><option value="date">Più recenti</option></select>
-    <select id="group" title="Raggruppa">
-      <option value="none">Nessun gruppo</option>
-      <option value="day">Per giorno</option>
-      <option value="month">Per mese</option>
-      <option value="kind">Per tipo</option>
-      <option value="extension">Per estensione</option>
-    </select>
+    <label class="search"><input id="q" type="search" placeholder="Cerca" spellcheck="false"></label>
+    <button id="sort" class="popup" title="Ordina"></button>
+    <button id="group" class="popup" title="Raggruppa"></button>
     <button id="settingsBtn" title="Impostazioni" aria-label="Impostazioni"></button>
   </div>
 

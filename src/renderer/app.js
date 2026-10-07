@@ -992,8 +992,34 @@ const refresh = () => Promise.all([renderPlaces(), render()])
 
 function setSort(value) {
   state.sort = localStorage.sort = value
-  $('#sort').value = value
+  renderControls()
   refresh()
+}
+
+function setGroup(value) {
+  state.group = localStorage.group = value
+  renderControls()
+  render()
+}
+
+/* ========== toolbar popup buttons ========== */
+
+const SORT_OPTIONS = [['name', 'Nome'], ['date', 'Più recenti']]
+const GROUP_OPTIONS = [['none', 'Nessun gruppo'], ['day', 'Per giorno'], ['month', 'Per mese'], ['kind', 'Per tipo'], ['extension', 'Per estensione']]
+
+// A button showing the current choice that opens the options as a menu, like a macOS pop-up button.
+function popupButton(button, options, current, pick) {
+  button.replaceChildren(el('span', '', options.find(([value]) => value === current)?.[1]), icon('chevronDown'))
+  button.onclick = () => {
+    const r = button.getBoundingClientRect()
+    showMenu({ preventDefault() {}, clientX: r.left, clientY: r.bottom + 6 },
+      options.map(([value, label]) => ({ label, check: value === current, run: () => pick(value) })))
+  }
+}
+
+function renderControls() {
+  popupButton($('#sort'), SORT_OPTIONS, state.sort, setSort)
+  popupButton($('#group'), GROUP_OPTIONS, state.group, setGroup)
 }
 
 /* ========== global events ========== */
@@ -1060,11 +1086,12 @@ function bindEvents() {
   $('#settingsBtn').onclick = openSettings
   $('#exportBtn').onclick = exportLibrary
   $('#importBtn').onclick = importLibrary
-  $('#sort').onchange = e => setSort(e.target.value)
-  $('#group').onchange = e => {
-    state.group = localStorage.group = e.target.value
-    render()
-  }
+  $('.search').prepend(icon('search'))
+  $('#q').addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !e.target.value) return
+    e.target.value = ''
+    e.target.dispatchEvent(new Event('input'))
+  })
   $('#q').oninput = e => {
     state.query = e.target.value.trim().toLowerCase()
     clearTimeout(state.queryTimer)
@@ -1119,8 +1146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const init = await call('init')
   Object.assign(state, { places: init.places, drives: init.drives })
   pins ??= init.places
-  $('#sort').value = state.sort
-  $('#group').value = state.group
+  renderControls()
   applySizes()
 
   const saved = store.get('tabs', []).filter(t => t?.cwd)
