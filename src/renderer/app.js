@@ -763,8 +763,14 @@ function placeButton(dir, name, kind) {
 }
 
 function renderPlaces() {
-  const kindOf = pin => state.places.find(p => samePath(p.path, pin.path))?.kind || 'folder'
-  $('#favs').replaceChildren(...pins.map(p => placeButton(p.path, p.name, kindOf(p))))
+  // System places keep their canonical order; folders pinned by the user follow in pin order.
+  const rank = pin => {
+    const i = state.places.findIndex(p => samePath(p.path, pin.path))
+    return i < 0 ? state.places.length : i
+  }
+  const kindOf = pin => state.places[rank(pin)]?.kind || 'folder'
+  const ordered = [...pins].sort((a, b) => rank(a) - rank(b))
+  $('#favs').replaceChildren(...ordered.map(p => placeButton(p.path, p.name, kindOf(p))))
   $('#drives').replaceChildren(...state.drives.map(d => placeButton(d, d.slice(0, 2), 'drive')))
 }
 
@@ -997,6 +1003,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabs.push({ cwd: init.start, focus: null })
     tabIndex = tabs.length - 1
   }
-  if (!tabs.length) tabs = [{ cwd: init.places[1].path, focus: null }]
+  if (!tabs.length) tabs = [{ cwd: init.places.find(p => p.kind === 'downloads').path, focus: null }]
   showTab()
 })
