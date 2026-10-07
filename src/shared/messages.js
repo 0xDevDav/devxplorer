@@ -158,6 +158,8 @@ const MESSAGES = {
     'preview.partial': 'partial preview',
     'preview.rendered': 'Preview',
     'preview.source': 'Source',
+    'copy.code': 'Copy',
+    'copy.done': 'Copied',
 
     'error.invalidName': 'Invalid name: {name}',
     'error.duplicateNames': 'Duplicate names',
@@ -320,6 +322,8 @@ const MESSAGES = {
     'preview.partial': 'anteprima parziale',
     'preview.rendered': 'Anteprima',
     'preview.source': 'Sorgente',
+    'copy.code': 'Copia',
+    'copy.done': 'Copiato',
 
     'error.invalidName': 'Nome non valido: {name}',
     'error.duplicateNames': 'Nomi duplicati',

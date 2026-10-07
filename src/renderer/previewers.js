@@ -181,6 +181,7 @@ function markdownInline(raw) {
 function renderMarkdown(text) {
   const lines = text.split(/\r?\n/)
   const out = []
+  const codeBlocks = [] // raw text of each fenced block, for its copy button
   let paragraph = []
   const flush = () => { if (paragraph.length) out.push(`<p>${markdownInline(paragraph.join(' '))}</p>`); paragraph = [] }
   const LIST = /^\s*([-*+]|\d+[.)])\s+/
@@ -192,7 +193,9 @@ function renderMarkdown(text) {
       flush()
       const code = []
       while (++i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i])
-      out.push(`<pre class="code">${highlightCode(code.join('\n'), m[1].toLowerCase())}</pre>`)
+      const language = m[1].toLowerCase()
+      out.push(`<div class="code-block" data-block="${codeBlocks.length}" data-language="${escapeHtml(language)}"><pre class="code">${highlightCode(code.join('\n'), language)}</pre></div>`)
+      codeBlocks.push(code.join('\n'))
     } else if ((m = line.match(/^(#{1,6})\s+(.*)/))) {
       flush()
       out.push(`<h${m[1].length}>${markdownInline(m[2])}</h${m[1].length}>`)
@@ -220,7 +223,28 @@ function renderMarkdown(text) {
   flush()
   const node = el('article', 'markdown')
   node.innerHTML = out.join('')
+  for (const block of node.querySelectorAll('.code-block')) block.append(copyButton(codeBlocks[block.dataset.block]))
   return node
+}
+
+// Copies a code block through the system clipboard and confirms briefly on the button itself.
+const COPIED_MS = 1500
+function copyButton(code) {
+  const button = el('button', 'copy-code')
+  const label = el('span', '', t('copy.code'))
+  button.append(icon('copy'), label)
+  button.onclick = async () => {
+    // the asynchronous web clipboard never blocks the window; the main process is only a fallback
+    await navigator.clipboard.writeText(code).catch(() => call('copyText', code))
+    button.classList.add('done')
+    button.replaceChildren(icon('check'), el('span', '', t('copy.done')))
+    clearTimeout(button.timer)
+    button.timer = setTimeout(() => {
+      button.classList.remove('done')
+      button.replaceChildren(icon('copy'), label)
+    }, COPIED_MS)
+  }
+  return button
 }
 
 /* ---------- entry point ---------- */

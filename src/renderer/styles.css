@@ -577,7 +577,17 @@ table.csv thead .rownum { z-index: 2; background: var(--panel2) }
 .markdown h1 { font-size: 30px } .markdown h2 { font-size: 23px } .markdown h3 { font-size: 18px }
 .markdown h1:first-child, .markdown h2:first-child { margin-top: 0 }
 .markdown code { padding: .1em .4em; font: .9em Consolas, monospace; background: #ffffff12; border-radius: 5px }
-.markdown pre.code { padding: 14px 18px; overflow: auto; font: 13px/1.6 Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px }
+.markdown pre.code { margin: 0; padding: 14px 18px; overflow: auto; font: 13px/1.6 Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px }
+
+/* fenced code blocks: language label on the left, copy button on the right while hovered */
+.code-block { position: relative; margin: 1em 0 }
+.code-block:not([data-language=""])::before { content: attr(data-language); position: absolute; top: 9px; left: 18px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+.code-block:not([data-language=""]) pre.code { padding-top: 32px }
+.copy-code { position: absolute; top: 7px; right: 7px; display: flex; align-items: center; gap: 6px; padding: 4px 9px; font-size: 12px; color: var(--text-soft); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; opacity: 0; transition: opacity var(--fast), color var(--fast), border-color var(--fast) }
+.code-block:hover .copy-code, .copy-code:focus-visible, .copy-code.done { opacity: 1 }
+.copy-code:hover { color: var(--text); border-color: var(--line-strong) }
+.copy-code.done { color: var(--c-green) }
+.copy-code .icon { width: 13px; height: 13px }
 .markdown blockquote { margin: 1em 0; padding: 2px 16px; color: var(--muted); border-left: 3px solid var(--accent) }
 .markdown hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0 }
 .markdown .md-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px }

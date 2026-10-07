@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, nativeImage, nativeTheme, Menu, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, nativeImage, nativeTheme, Menu, dialog, clipboard } = require('electron')
 const fs = require('fs')
 const os = require('os')
 const fsp = fs.promises
@@ -65,6 +65,8 @@ async function describe(p) {
 let win = null
 let chrome = null
 let viewerOpen = false
+let quitting = false
+app.on('before-quit', () => { quitting = true })
 // Error messages and dialogs follow the language the renderer reports (system locale until then).
 let t = translator('en')
 let currentLanguage = null
@@ -218,6 +220,8 @@ const handlers = {
 
   // Keeps system-drawn surfaces (Mica, native dialogs) in the app's theme and toggles the glass material.
   setViewerOpen(open) { viewerOpen = !!open },
+
+  copyText: text => clipboard.writeText(text),
 
   shellIntegration: () => shellIntegration.isEnabled(),
 
@@ -377,9 +381,11 @@ app.whenReady().then(() => {
   })
   if (saved.maximized) win.maximize()
   // While a preview is open, the window's close button (or Alt+F4) closes the preview instead:
-  // users read the X in the corner as "close what I am looking at".
+  // users read the X in the corner as "close what I am looking at". Quitting the app or ending the
+  // Windows session must never be held back by this.
+  win.on('session-end', () => { quitting = true })
   win.on('close', e => {
-    if (viewerOpen) {
+    if (viewerOpen && !quitting) {
       e.preventDefault()
       win.webContents.send('close-viewer')
       return
