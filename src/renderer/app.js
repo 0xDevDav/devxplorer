@@ -1269,6 +1269,7 @@ async function undo() {
 async function runBatch(name, ...args) {
   const result = await call(name, ...args)
   if (result?.error) toast(result.error)
+  else if (result?.cancelled) toast(t('progress.cancelled'), 'info')
   return result?.done || []
 }
 const batchSucceeded = async promise => { const r = await promise; return !!r && !r.error }
@@ -1294,6 +1295,39 @@ async function renameItems(pairs) {
 async function trashItems(paths) {
   const trashed = await runBatch('trash', paths)
   if (trashed.length) pushUndo('action.trash', async () => (await call('restore', trashed))?.length)
+}
+
+/*
+ * Progress of long file operations, in a panel at the bottom right like the Finder's: what is
+ * happening, a bar (sliding while the size is unknown), the amount done and a cancel button.
+ * Operations that finish within PROGRESS_DELAY_MS never show it.
+ */
+const PROGRESS_DELAY_MS = 400
+const progressRows = new Map()
+
+function showProgress(report) {
+  let row = progressRows.get(report.id)
+  if (report.finished) {
+    clearTimeout(row?.timer)
+    row?.node.remove()
+    progressRows.delete(report.id)
+    $('#progress').hidden = !progressRows.size
+    return
+  }
+  if (!row) {
+    const node = el('div', 'progress-row')
+    const cancel = el('button', 'progress-cancel')
+    cancel.append(icon('close'))
+    cancel.title = t('progress.cancel')
+    cancel.onclick = () => call('cancelOperation', report.id)
+    node.append(el('div', 'progress-label', t.n('progress.' + report.kind, report.count)), el('div', 'progress-bar'), el('div', 'progress-detail'), cancel)
+    row = { node, timer: setTimeout(() => { $('#progress').append(node); $('#progress').hidden = false }, PROGRESS_DELAY_MS) }
+    progressRows.set(report.id, row)
+  }
+  const known = report.total > 0
+  row.node.querySelector('.progress-bar').classList.toggle('indeterminate', !known)
+  row.node.querySelector('.progress-bar').style.setProperty('--done', known ? (report.done / report.total * 100).toFixed(1) + '%' : '0%')
+  row.node.querySelector('.progress-detail').textContent = known ? t('progress.amount', { done: formatBytes(report.done), total: formatBytes(report.total) }) : ''
 }
 
 /* ========== clipboard (within the app) ========== */
@@ -2552,6 +2586,7 @@ function bindEvents() {
   api.onChanged(refresh)
   api.onOpenFolder(dir => newTab(dir))
   api.onCloseViewer(closeViewer)
+  api.onProgress(showProgress)
   // Picks up changes made by other programs while the window was in the background.
   window.addEventListener('focus', refresh)
   // Selections turn grey while the window is in the background, as on macOS.

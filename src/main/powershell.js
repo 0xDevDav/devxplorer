@@ -7,11 +7,11 @@ const UTF8 = '[Console]::OutputEncoding = [Text.Encoding]::UTF8; '
  * Runs a fixed PowerShell script. Values such as paths never become part of the script text: they
  * are passed as DX_* environment variables, so no file name can be read as code.
  */
-function powershell(script, values = {}) {
+function powershell(script, values = {}, signal = undefined) {
   const env = { ...process.env }
   for (const [name, value] of Object.entries(values)) env['DX_' + name] = value
   return new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', UTF8 + script],
-    { windowsHide: true, env }, (error, stdout, stderr) => error ? reject(new Error(stderr.trim().split(/\r?\n/)[0] || error.message)) : resolve(stdout)))
+    { windowsHide: true, env, signal }, (error, stdout, stderr) => error ? reject(new Error(stderr.trim().split(/\r?\n/)[0] || error.message)) : resolve(stdout)))
 }
 
 // Zips files and folders with .NET, which handles files over 2 GB; a failed archive is removed.
@@ -38,7 +38,8 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::ExtractToDirectory($env:DX_SRC, $env:DX_DEST)`
 
-const zip = (paths, dest) => powershell(ZIP_SCRIPT, { PATHS: JSON.stringify(paths), DEST: dest })
-const unzip = (src, dest) => powershell(UNZIP_SCRIPT, { SRC: src, DEST: dest })
+// signal stops the work; the caller removes what was written.
+const zip = (paths, dest, signal) => powershell(ZIP_SCRIPT, { PATHS: JSON.stringify(paths), DEST: dest }, signal)
+const unzip = (src, dest, signal) => powershell(UNZIP_SCRIPT, { SRC: src, DEST: dest }, signal)
 
 module.exports = { powershell, zip, unzip }

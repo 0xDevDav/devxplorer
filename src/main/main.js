@@ -187,6 +187,33 @@ async function onlineOnlyNames(dir) {
   return new Set(output.split(/\r?\n/).filter(Boolean))
 }
 
+/*
+ * Long file operations tell their window how far they are (at most ten times a second) and can be
+ * cancelled from it. kind names the operation for the renderer; total is 0 when unknown.
+ */
+const operations = new Map()
+let operationIds = 0
+
+async function runOperation(win, kind, count, work) {
+  const id = ++operationIds
+  const controller = new AbortController()
+  operations.set(id, controller)
+  const send = message => { if (!win.isDestroyed()) win.webContents.send('progress', { id, kind, count, ...message }) }
+  let last = 0
+  const onProgress = (done, total) => {
+    if (Date.now() - last < 100 && done < total) return
+    last = Date.now()
+    send({ done, total })
+  }
+  send({ done: 0, total: 0 })
+  try {
+    return await work({ onProgress, signal: controller.signal })
+  } finally {
+    operations.delete(id)
+    send({ finished: true })
+  }
+}
+
 const handlers = {
   // The first window restores the saved tabs; later ones open on their own folder only.
   async init() {
@@ -441,25 +468,44 @@ const handlers = {
   },
 
   // Zips the items into the folder of the first one: "name.zip" for one item, "Archive.zip" for more.
-  async compress(paths) {
+  // Cancelling leaves nothing behind and resolves to null.
+  compress(paths) {
     const dir = path.dirname(paths[0])
     const base = paths.length === 1 ? path.basename(paths[0], fs.statSync(paths[0]).isDirectory() ? '' : path.extname(paths[0])) : t('zip.archive')
     const dest = uniquePath(path.join(dir, base + '.zip'))
-    await zip(paths, dest)
-    return dest
+    return runOperation(this, 'zip', paths.length, async ({ signal }) => {
+      try {
+        await zip(paths, dest, signal)
+        return dest
+      } catch (e) {
+        if (!signal.aborted) throw e
+        await fsp.rm(dest, { force: true }).catch(() => {})
+        return null
+      }
+    })
   },
 
   // Extracts a .zip into a new folder named after it.
-  async extract(p) {
+  extract(p) {
     const dest = uniquePath(path.join(path.dirname(p), path.basename(p, path.extname(p))))
-    await unzip(p, dest)
-    return dest
+    return runOperation(this, 'unzip', 1, async ({ signal }) => {
+      try {
+        await unzip(p, dest, signal)
+        return dest
+      } catch (e) {
+        if (!signal.aborted) throw e
+        await fsp.rm(dest, { recursive: true, force: true }).catch(() => {})
+        return null
+      }
+    })
   },
 
-  // Batches return { done: [[from, to]], error }, so a partly completed batch can still be undone.
-  move: (paths, dest) => ops.move(paths, dest),
+  cancelOperation(id) { operations.get(id)?.abort() },
+
+  // Batches return { done: [[from, to]], error | cancelled }, so a partly completed batch can still be undone.
+  move(paths, dest) { return runOperation(this, 'move', paths.length, options => ops.move(paths, dest, options)) },
   moveTo: pairs => ops.moveTo(pairs),
-  copy: (paths, dest) => ops.copy(paths, dest),
+  copy(paths, dest) { return runOperation(this, 'copy', paths.length, options => ops.copy(paths, dest, options)) },
 
   restore: paths => recycle.restore(paths),
 

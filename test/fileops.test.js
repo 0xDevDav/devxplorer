@@ -72,14 +72,36 @@ test('moving across drives keeps dates and leaves nothing behind on failure', as
     assert.equal(fs.existsSync(src), false)
     assert.equal(fs.statSync(dest).mtimeMs, old.getTime())
 
+    // A move across drives that is cancelled halfway leaves the original and no partial copy.
     const folder = path.join(dir, 'folder')
     fs.mkdirSync(folder)
-    fs.writeFileSync(path.join(folder, 'a.txt'), 'a')
+    for (let i = 0; i < 3; i++) fs.writeFileSync(path.join(folder, i + '.bin'), Buffer.alloc(256 * 1024))
     const target = path.join(dir, 'copy')
+    const controller = new AbortController()
+    let seen = 0
+    const tick = bytes => { seen += bytes; if (seen > 300 * 1024) controller.abort() }
     await withStub('rename', (rename) => Promise.reject(crossDrive(rename)), () =>
-      withStub('cp', async (cp, from, to, options) => { await fsp.mkdir(to); throw new Error('disk full') }, () =>
-        assert.rejects(ops.moveItem(folder, target), /disk full/)))
+      assert.rejects(ops.moveItem(folder, target, tick, controller.signal)))
     assert.equal(fs.existsSync(target), false)
-    assert.equal(fs.existsSync(path.join(folder, 'a.txt')), true)
+    assert.equal(fs.readdirSync(folder).length, 3)
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('copies report progress in bytes and a cancelled batch says so', async () => {
+  const dir = tempDir()
+  try {
+    const dest = path.join(dir, 'dest')
+    fs.mkdirSync(dest)
+    const files = [1, 2].map(n => { const p = path.join(dir, n + '.bin'); fs.writeFileSync(p, Buffer.alloc(100 * 1024)); return p })
+    const reports = []
+    const result = await ops.copy(files, dest, { onProgress: (done, total) => reports.push([done, total]) })
+    assert.equal(result.done.length, 2)
+    assert.deepEqual(reports.at(-1), [200 * 1024, 200 * 1024])
+    assert.ok(Math.abs(fs.statSync(path.join(dest, '1.bin')).mtimeMs - fs.statSync(files[0]).mtimeMs) < 1)
+
+    const controller = new AbortController()
+    controller.abort()
+    const cancelled = await ops.copy(files, dest, { signal: controller.signal })
+    assert.deepEqual(cancelled, { done: [], cancelled: true })
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
 })
