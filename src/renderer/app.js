@@ -122,6 +122,7 @@ const state = {
   selection: new Set(),
   anchor: null,
   sort: localStorage.sort || 'name',
+  reverse: localStorage.reverse === 'true',
   group: localStorage.group || 'none',
   query: '',
 }
@@ -199,7 +200,17 @@ function showAlert(message) {
   if (!sheet.open) sheet.showModal()
 }
 
-const sorted = items => items.sort(state.sort === 'date' ? (a, b) => fileDate(b) - fileDate(a) : byName)
+// Sort orders; ties fall back to the name. Folders have no size, so they stay by name under "size".
+const SORTS = {
+  name: byName,
+  date: (a, b) => fileDate(b) - fileDate(a) || byName(a, b),
+  size: (a, b) => (b.size || 0) - (a.size || 0) || byName(a, b),
+  kind: (a, b) => collator.compare(extensionOf(a.name), extensionOf(b.name)) || byName(a, b),
+}
+const sorted = items => {
+  const compare = SORTS[state.sort] || byName
+  return items.sort(state.reverse ? (a, b) => compare(b, a) : compare)
+}
 const nameMatches = item => !state.query || item.name.toLowerCase().includes(state.query)
 
 /* ========== extensions ========== */
@@ -2062,18 +2073,24 @@ function setGroup(value) {
 
 /* ========== toolbar popup buttons ========== */
 
-const SORT_OPTIONS = [['name', 'sort.name'], ['date', 'sort.date']]
+const SORT_OPTIONS = [['name', 'sort.name'], ['date', 'sort.date'], ['size', 'sort.size'], ['kind', 'sort.kind']]
 const GROUP_OPTIONS = [['none', 'group.none'], ['day', 'group.day'], ['month', 'group.month'], ['kind', 'group.kind'], ['extension', 'group.extension']]
 
 // A button showing the current choice that opens the options as a menu, like a macOS pop-up button.
 // The leading icon replaces the label in narrow windows.
-function popupButton(button, options, current, pick, iconName) {
+// extra: menu items listed after the options, below a separator.
+function popupButton(button, options, current, pick, iconName, extra = []) {
   button.replaceChildren(icon(iconName, 'lead'), el('span', '', t(options.find(([value]) => value === current)?.[1])), icon('chevronDown'))
-  button.onclick = () => menuBelow(button, options.map(([value, label]) => ({ label: t(label), check: value === current, run: () => pick(value) })))
+  button.onclick = () => menuBelow(button, [
+    ...options.map(([value, label]) => ({ label: t(label), check: value === current, run: () => pick(value) })),
+    ...(extra.length ? ['-', ...extra] : []),
+  ])
 }
 
 function renderControls() {
-  popupButton($('#sort'), SORT_OPTIONS, state.sort, setSort, 'sort')
+  popupButton($('#sort'), SORT_OPTIONS, state.sort, setSort, 'sort', [
+    { label: t('sort.reverse'), check: state.reverse, run: () => { state.reverse = !state.reverse; localStorage.reverse = state.reverse; renderControls(); render() } },
+  ])
   popupButton($('#group'), GROUP_OPTIONS, state.group, setGroup, 'group')
 }
 
