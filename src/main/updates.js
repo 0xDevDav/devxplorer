@@ -2,7 +2,7 @@
  * Updates from the GitHub releases of the project. The app checks shortly after starting and on
  * request, downloads a new version in the background and installs it on restart (or on quit).
  * Every window is told the current state: idle, checking, latest, downloading (percent), ready,
- * error, or dev when running from source, where there is nothing to update.
+ * error, dev when running from source, or store when the Microsoft Store updates the app.
  */
 const { app, BrowserWindow } = require('electron')
 const { autoUpdater } = require('electron-updater')
@@ -17,6 +17,7 @@ function set(next) {
 }
 
 function check() {
+  if (process.windowsStore) return set({ status: 'store' })
   if (!app.isPackaged) return set({ status: 'dev' })
   autoUpdater.checkForUpdates().catch(error => log.error('update check:', error))
 }

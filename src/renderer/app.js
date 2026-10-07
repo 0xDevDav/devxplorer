@@ -2730,11 +2730,13 @@ function renderUpdate(next = updateState) {
     ready: t('update.ready', { version }),
     error: t('update.error'),
     dev: t('update.dev'),
+    store: t('update.store'),
   }[status] || ''
   $('#updateHint').textContent = [current && t('update.version', { version: current }), text].filter(Boolean).join(' · ')
   const button = $('#updateBtn')
   button.textContent = t(status === 'ready' ? 'update.restart' : 'update.check')
   button.disabled = status === 'checking' || status === 'downloading'
+  button.hidden = status === 'store'
   if (status === 'ready' && !renderUpdate.announced) {
     renderUpdate.announced = true
     showUpdateBanner(version)
@@ -2761,6 +2763,8 @@ function showUpdateBanner(version) {
 const SETUP_STEPS = ['welcome', 'appearance', 'extensions', 'integration', 'done']
 
 function openSetup(step = 0) {
+  // The Store app has its menu entry built in and cannot change the default file manager.
+  if (state.store && SETUP_STEPS[step] === 'integration') step += step < Number(localStorage.setupStep) ? -1 : 1
   localStorage.setupStep = step
   const sheet = $('#setup')
   const name = SETUP_STEPS[step]
@@ -2888,7 +2892,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   bindEvents()
   call('hasVsCode').then(found => { hasVsCode = found })
   const init = await call('init')
-  Object.assign(state, { places: init.places, drives: init.drives, supportsGlass: init.supportsGlass })
+  Object.assign(state, { places: init.places, drives: init.drives, supportsGlass: init.supportsGlass, store: init.store })
+  $('#shellGroup').hidden = init.store
   applyTheme()
   pins ??= init.places
   renderControls()

@@ -19,6 +19,11 @@ const { pickLanguage, translator } = require('../shared/messages')
 const DATA_DIR = app.getPath('userData')
 const WINDOW_FILE = path.join(DATA_DIR, 'window.json')
 
+// Installed from the Microsoft Store: the Store updates the app, its package declares the Windows 11
+// menu entry, and writes to the registry stay private to the app, so File Explorer integration
+// through HKCU is not available.
+const FROM_STORE = !!process.windowsStore
+
 // Unexpected errors are written to the log instead of stopping the app with an error box.
 log.init(path.join(DATA_DIR, 'logs'))
 process.on('uncaughtException', error => log.error('main:', error))
@@ -220,6 +225,7 @@ const handlers = {
   async init() {
     return {
     secondary: !!this.startFolder,
+    store: FROM_STORE,
     supportsGlass: SUPPORTS_MICA,
     start: this.startFolder ?? folderArgument(process.argv),
     places: ['desktop', 'pictures', 'videos', 'documents', 'downloads'].map(kind => ({ path: app.getPath(kind), kind })),
@@ -585,7 +591,7 @@ const MODERN_MENU = app.isPackaged ? path.join(process.resourcesPath, 'shellext'
 // leaves it behind.
 let modernMenuQueue = Promise.resolve()
 // Only the installed app manages it: a development run would replace the installed app's package.
-const queueModernMenu = work => app.isPackaged
+const queueModernMenu = work => app.isPackaged && !FROM_STORE
   ? (modernMenuQueue = modernMenuQueue.then(work).catch(error => log.error('context menu package:', error)))
   : modernMenuQueue
 const installModernMenu = () => queueModernMenu(() => shellIntegration.installModernMenu(MODERN_MENU, path.join(DATA_DIR, 'shellext'), app.getVersion()))
@@ -686,7 +692,8 @@ app.whenReady().then(() => {
   appearance = saved.appearance ?? { theme: 'system', glass: SUPPORTS_MICA }
   nativeTheme.themeSource = appearance.theme
   createWindow().webContents.once('did-finish-load', () => library.prune().catch(() => {}))
-  updates.start()
+  if (FROM_STORE) updates.check()
+  else updates.start()
   // An update brings a new menu package: register it if the integration is on.
   shellIntegration.isEnabled().then(on => on && installModernMenu())
 })
