@@ -165,6 +165,22 @@ async function searchTree(dir, query, showHidden) {
   return { items, truncated: found.length >= SEARCH_LIMIT }
 }
 
+/*
+ * OneDrive "online-only" files have no local content: reading them (for a text preview, a model
+ * thumbnail) would download them. Windows marks them with the recall-on-access, recall-on-open or
+ * offline attributes, which Node cannot read, so folders under a OneDrive root are asked once
+ * through PowerShell.
+ */
+const CLOUD_ROOTS = [process.env.OneDrive, process.env.OneDriveConsumer, process.env.OneDriveCommercial].filter(Boolean)
+const CLOUD_ATTRIBUTES = 0x400000 | 0x40000 | 0x1000
+const CLOUD_SCRIPT = `Get-ChildItem -LiteralPath $env:DX_DIR -Force | Where-Object { [int]$_.Attributes -band ${CLOUD_ATTRIBUTES} } | ForEach-Object { $_.Name }`
+
+async function onlineOnlyNames(dir) {
+  if (!CLOUD_ROOTS.some(root => lower(dir) === lower(root) || lower(dir).startsWith(lower(root) + path.sep))) return new Set()
+  const output = await powershell(CLOUD_SCRIPT, { DIR: dir }).catch(() => '')
+  return new Set(output.split(/\r?\n/).filter(Boolean))
+}
+
 const handlers = {
   // The first window restores the saved tabs; later ones open on their own folder only.
   async init() {
@@ -215,9 +231,10 @@ const handlers = {
     const names = await fsp.readdir(dir).catch(e => { denied = e.code === 'EPERM' || e.code === 'EACCES'; return [] })
     names.filter(n => STRAY_NUL.test(n)).forEach(n => removeStrayNul(path.join(dir, n)))
     const shown = names.filter(n => !STRAY_NUL.test(n) && (showHidden || !HIDDEN.test(n)))
+    const cloud = await onlineOnlyNames(dir)
     const items = (await Promise.all(shown.map(async n => {
       const item = await describe(path.join(dir, n))
-      return item && HIDDEN.test(n) ? { ...item, hidden: true } : item
+      return item && { ...item, ...(HIDDEN.test(n) && { hidden: true }), ...(cloud.has(n) && { cloud: true }) }
     }))).filter(Boolean)
     return { folders: items.filter(i => i.isDir), files: items.filter(i => !i.isDir), denied }
   },

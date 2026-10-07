@@ -51,6 +51,7 @@ const ICONS = {
   drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+  cloud: '<path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.4 9.6 4.5 4.5 0 0 0 7 18.5z"/>',
   minus: '<path d="M5 12h14"/>',
   fitWidth: '<path d="M4 6v12M20 6v12M8 12h8M10.5 9.5 8 12l2.5 2.5M13.5 9.5 16 12l-2.5 2.5"/>',
   viewIcons: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
@@ -276,6 +277,7 @@ const metaMatches = m => !!m && activeExtensions().every(x => !x.filter?.active(
 
 function badges(p) {
   const box = el('span', 'badges')
+  if (state.items.get(p)?.cloud) box.append(icon('cloud', 'cloud-badge'))
   const m = state.meta[p]
   if (m) activeExtensions().forEach(x => box.append(...(x.badges?.(m) || [])))
   return box
@@ -507,6 +509,7 @@ async function importLibrary() {
 async function loadPreview(path, type) {
   if (type !== 'file') return { img: await call('thumb', path) }
   if (docKind(baseName(path)) === 'app') return { icon: await call('appIcon', path) }
+  if (state.items.get(path)?.cloud) return {} // reading it would download it
   if (MESH_EXT.test(path)) return { img: await meshThumbnail(path) }
   const text = await call('readText', path)
   return text != null ? { text } : {}
@@ -1980,7 +1983,19 @@ function renderPlaces() {
   }
   const ordered = [...pins].sort((a, b) => rank(a) - rank(b))
   $('#favs').replaceChildren(...ordered.map(p => placeButton(p.path, placeLabel(p.path), placeKind(p.path))))
-  $('#drives').replaceChildren(...state.drives.map(d => placeButton(d, d.slice(0, 2), 'drive')))
+  $('#drives').replaceChildren(...state.drives.map(d => {
+    const b = placeButton(d, d.slice(0, 2), 'drive')
+    // How full the drive is, as a thin bar under its name; the tooltip gives the figures.
+    call('diskSpace', d).then(space => {
+      if (!space?.total) return
+      const used = 1 - space.free / space.total
+      const bar = el('span', 'drive-bar' + (used > 0.9 ? ' full' : ''))
+      bar.style.setProperty('--used', (used * 100).toFixed(1) + '%')
+      b.querySelector('span').append(bar)
+      b.title = `${d.slice(0, 2)}\n${t('drive.space', { free: formatBytes(space.free), total: formatBytes(space.total) })}`
+    })
+    return b
+  }))
 }
 
 function renderExtensionFilters() {

@@ -70,6 +70,7 @@ const MESSAGES = {
     'status.selected.other': '{n} selected',
     'status.computing': 'calculating…',
     'status.free': '{size} available',
+    'drive.space': '{free} free of {total}',
 
     'places.favorites': 'Favorites',
     'places.pc': 'This PC',
@@ -351,6 +352,7 @@ const MESSAGES = {
     'status.selected.other': '{n} selezionati',
     'status.computing': 'calcolo…',
     'status.free': '{size} disponibili',
+    'drive.space': '{free} liberi su {total}',
 
     'places.favorites': 'Preferiti',
     'places.pc': 'Questo PC',
