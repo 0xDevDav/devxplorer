@@ -425,7 +425,7 @@ const handlers = {
       installModernMenu()
     } else {
       await shellIntegration.disable()
-      shellIntegration.removeModernMenu()
+      removeModernMenu()
     }
     return shellIntegration.isEnabled()
   },
@@ -453,6 +453,9 @@ const handlers = {
   newWindow(dir) { createWindow(dir, this) },
 
   open: p => shell.openPath(p),
+  about: () => ({ version: app.getVersion(), url: PROJECT_URL }),
+  openProjectPage: () => shell.openExternal(PROJECT_URL),
+
   // Always File Explorer, even when DevXplorer is the default for folders.
   openInExplorer: dir => launch('explorer.exe', [dir]),
   reveal: p => shell.showItemInFolder(p),
@@ -578,8 +581,18 @@ function folderArgument(argv) {
 
 // The Windows 11 menu package: shipped with the installed app, built into assets/shellext in a checkout.
 const MODERN_MENU = app.isPackaged ? path.join(process.resourcesPath, 'shellext') : path.join(__dirname, '..', '..', 'assets', 'shellext')
-const installModernMenu = () => shellIntegration.installModernMenu(MODERN_MENU, path.join(DATA_DIR, 'shellext'), app.getVersion())
-  .catch(error => log.error('context menu package:', error))
+// Registering and removing the package run one after the other, so a quick off after on never
+// leaves it behind.
+let modernMenuQueue = Promise.resolve()
+// Only the installed app manages it: a development run would replace the installed app's package.
+const queueModernMenu = work => app.isPackaged
+  ? (modernMenuQueue = modernMenuQueue.then(work).catch(error => log.error('context menu package:', error)))
+  : modernMenuQueue
+const installModernMenu = () => queueModernMenu(() => shellIntegration.installModernMenu(MODERN_MENU, path.join(DATA_DIR, 'shellext'), app.getVersion()))
+const removeModernMenu = () => queueModernMenu(() => shellIntegration.removeModernMenu())
+
+// The project's home, shown in the About section and the listing.
+const PROJECT_URL = require('../../package.json').homepage
 
 // How Windows should start the app: the packaged executable, or Electron with the project path.
 const launchCommand = () => app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]

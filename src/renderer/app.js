@@ -23,7 +23,7 @@ const fileUrl = p => 'file:///' + encodeURI(p.replace(/\\/g, '/')).replace(/#/g,
 /* ========== language ========== */
 
 // "system" follows the Windows display language; unsupported languages fall back to English.
-const languagePreference = () => localStorage.language || 'en'
+const languagePreference = () => localStorage.language || 'system'
 const language = pickLanguage(languagePreference() === 'system' ? navigator.language : languagePreference())
 const t = translator(language)
 document.documentElement.lang = language
@@ -2553,6 +2553,10 @@ function bindEvents() {
   }
   $('#exportBtn').onclick = exportLibrary
   $('#logBtn').onclick = () => call('showLog')
+  $('#projectBtn').onclick = () => call('openProjectPage')
+  call('about').then(info => {
+    if (info) $('#aboutLine').textContent = t('about.line', { version: info.version, url: info.url.replace(/^https:\/\//, '') })
+  })
   $('#updateBtn').onclick = () => updateState.status === 'ready' ? call('installUpdate') : call('checkForUpdates')
   $('#setupBtn').onclick = () => { $('#settings').close(); openSetup() }
   // The assistant is not dismissed with Esc: it ends with its last button.
@@ -2814,8 +2818,15 @@ function openSetup(step = 0) {
     }
     const [menuRow, menuToggle] = switchRow('shell.title', 'shell.hint')
     const [defaultRow, defaultToggle] = switchRow('default.title', 'default.hint')
-    call('shellIntegration').then(on => { menuToggle.checked = !!on })
-    call('defaultFileManager').then(on => { defaultToggle.checked = !!on })
+    // On the first setup both start on, so Continue alone gives the full integration; turning a
+    // switch off undoes it at once.
+    const ready = localStorage.setupDone === 'true' || localStorage.integrationOffered === 'true'
+      ? Promise.resolve()
+      : call('setDefaultFileManager', true).then(() => { localStorage.integrationOffered = 'true' })
+    ready.then(() => {
+      call('shellIntegration').then(on => { menuToggle.checked = !!on })
+      call('defaultFileManager').then(on => { defaultToggle.checked = !!on })
+    })
     menuToggle.onchange = async () => {
       menuToggle.checked = !!(await call('setShellIntegration', menuToggle.checked))
       if (!menuToggle.checked) defaultToggle.checked = false
