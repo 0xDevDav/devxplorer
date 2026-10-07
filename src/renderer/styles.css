@@ -154,17 +154,6 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
   -webkit-app-region: drag;
 }
 
-.brand { font-weight: 600; color: var(--text-strong); white-space: nowrap }
-.brand::before {
-  content: "";
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-right: 8px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-}
-
 #tabs { display: flex; align-items: flex-end; align-self: stretch; gap: 2px; min-width: 0; padding-top: 6px }
 .tab {
   -webkit-app-region: no-drag;
