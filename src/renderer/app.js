@@ -220,7 +220,10 @@ const extensionApi = {
   ask,
   setMeta,
   render,
-  refreshViewer: () => { if (viewerOpen()) showViewer() },
+  // Only the badges change, so a playing video or a loaded model is left alone.
+  refreshViewer: () => {
+    if (viewerOpen()) $('#viewer .viewer-bar .badges')?.replaceWith(badges(viewer.items[viewer.index].path))
+  },
 }
 
 function registerExtension(factory) {
@@ -386,6 +389,7 @@ const SHORTCUTS = [
     ['Ctrl+V', 'menu.paste'],
     ['Ctrl+D', 'menu.duplicate'],
     ['Ctrl+Shift+C', 'menu.copyPath'],
+    ['Alt+key.drag', 'keys.reorder'],
     ['Ctrl+Z', 'keys.undo'],
     ['Ctrl+A', 'keys.selectAll'],
     ['Esc', 'keys.deselect'],
@@ -859,13 +863,14 @@ function fileCard(file, siblings) {
     else call('open', file.path)
   })
 
-  // Dropping on a card inserts before or after it, depending on the pointer's half.
+  // Dropping files from another folder moves them here. Holding Alt reorders within the folder:
+  // the files are inserted before or after this card, by the pointer's half, and renumbered.
   const after = e => { const r = card.getBoundingClientRect(); return e.clientX > r.left + r.width / 2 }
   card.addEventListener('dragover', e => {
     e.preventDefault()
     e.stopPropagation()
-    card.classList.toggle('ins-after', after(e))
-    card.classList.toggle('ins-before', !after(e))
+    card.classList.toggle('ins-after', e.altKey && after(e))
+    card.classList.toggle('ins-before', e.altKey && !after(e))
   })
   card.addEventListener('dragleave', () => card.classList.remove('ins-before', 'ins-after'))
   card.addEventListener('drop', async e => {
@@ -876,8 +881,9 @@ function fileCard(file, siblings) {
     const paths = droppedPaths(e)
     const dir = parentDir(file.path)
     if (!paths.length) return
-    if (paths.every(p => samePath(parentDir(p), dir))) await reorder(dir, paths, file.path, insertAfter)
-    else await moveItems(paths, dir)
+    if (!paths.every(p => samePath(parentDir(p), dir))) await moveItems(paths, dir)
+    else if (e.altKey) await reorder(dir, paths, file.path, insertAfter)
+    else return
     refresh()
   })
   return card
@@ -909,7 +915,8 @@ function selectable(node, path, isFolder) {
 
 function select(path, e) {
   const sel = state.selection
-  if (e.shiftKey && state.anchor) {
+  // A range needs its anchor on screen; otherwise (another folder, filtered out) it is a plain click.
+  if (e.shiftKey && visiblePaths().includes(state.anchor)) {
     const all = visiblePaths()
     const [from, to] = [all.indexOf(state.anchor), all.indexOf(path)].sort((a, b) => a - b)
     if (!e.ctrlKey) sel.clear()
@@ -1749,6 +1756,7 @@ function showTab() {
   state.focus = tab.focus
   extensions.forEach(x => x.filter?.reset())
   state.selection.clear()
+  state.anchor = null
   $('#folders').scrollTop = 0
   rememberRecent(tab.cwd)
   call('watch', tab.cwd)

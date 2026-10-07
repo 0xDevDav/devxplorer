@@ -439,6 +439,10 @@ app.whenReady().then(() => {
     },
   })
   if (saved.maximized) win.maximize()
+  // The window only ever shows the app: no new windows, and no navigation away (a file dropped
+  // outside a drop zone would otherwise replace the page).
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', e => e.preventDefault())
   // While a preview is open, the window's close button (or Alt+F4) closes the preview instead:
   // users read the X in the corner as "close what I am looking at". Quitting the app or ending the
   // Windows session must never be held back by this.

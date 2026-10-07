@@ -151,6 +151,8 @@ const MESSAGES = {
     'key.enter': 'Enter',
     'key.backspace': 'Backspace',
     'key.wheel': 'Wheel',
+    'key.drag': 'Drag',
+    'keys.reorder': 'Reorder files in the folder, numbering them',
 
     'path.notFound': 'Folder not found: {path}',
     'palette.placeholder': 'Go to folder…',
@@ -367,6 +369,8 @@ const MESSAGES = {
     'key.enter': 'Invio',
     'key.backspace': 'Backspace',
     'key.wheel': 'Rotella',
+    'key.drag': 'Trascina',
+    'keys.reorder': 'Riordina i file nella cartella numerandoli',
 
     'path.notFound': 'Cartella non trovata: {path}',
     'palette.placeholder': 'Vai alla cartella…',
