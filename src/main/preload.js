@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('api', {
   pathFor: file => webUtils.getPathForFile(file),
   onChanged: fn => ipcRenderer.on('changed', fn),
   onOpenFolder: fn => ipcRenderer.on('open-folder', (e, dir) => fn(dir)),
+  onCloseViewer: fn => ipcRenderer.on('close-viewer', fn),
 })

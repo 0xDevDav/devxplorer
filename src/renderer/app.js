@@ -1095,12 +1095,14 @@ function openViewer(items, current) {
   // With the glass material the controls stay transparent over the black viewer: Windows does not
   // clear an opaque overlay color when switching back to transparent, which left a black block.
   call('overlay', { color: glassOn() ? '#00000000' : '#000000', symbolColor: '#c9c9d4' })
+  call('setViewerOpen', true)
   showViewer()
 }
 
 function closeViewer() {
   const box = $('#viewer')
   box.classList.remove('show')
+  call('setViewerOpen', false)
   box.querySelector('video')?.pause()
   disposeMeshView()
   syncWindowControls()
@@ -1190,7 +1192,11 @@ function showViewer() {
     t('viewer.hint.close'),
   ]
   const bar = el('div', 'viewer-bar')
-  bar.append(el('span', '', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
+  const close = el('button', 'viewer-close')
+  close.title = t('viewer.close')
+  close.append(icon('close'))
+  close.onclick = closeViewer
+  bar.append(close, el('span', 'viewer-title', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
   if (transparent) box.append(matteSwitch())
   if (infoOpen()) box.append(infoPanel(file, media))
@@ -1882,6 +1888,7 @@ function bindEvents() {
   systemDark.addEventListener('change', applyTheme)
   api.onChanged(refresh)
   api.onOpenFolder(dir => newTab(dir))
+  api.onCloseViewer(closeViewer)
   // Picks up changes made by other programs while the window was in the background.
   window.addEventListener('focus', refresh)
 }

@@ -64,6 +64,7 @@ async function describe(p) {
 
 let win = null
 let chrome = null
+let viewerOpen = false
 // Error messages and dialogs follow the language the renderer reports (system locale until then).
 let t = translator('en')
 let currentLanguage = null
@@ -216,6 +217,8 @@ const handlers = {
   },
 
   // Keeps system-drawn surfaces (Mica, native dialogs) in the app's theme and toggles the glass material.
+  setViewerOpen(open) { viewerOpen = !!open },
+
   shellIntegration: () => shellIntegration.isEnabled(),
 
   async setShellIntegration(enabled) {
@@ -373,7 +376,16 @@ app.whenReady().then(() => {
     },
   })
   if (saved.maximized) win.maximize()
-  win.on('close', () => writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome, appearance }))
+  // While a preview is open, the window's close button (or Alt+F4) closes the preview instead:
+  // users read the X in the corner as "close what I am looking at".
+  win.on('close', e => {
+    if (viewerOpen) {
+      e.preventDefault()
+      win.webContents.send('close-viewer')
+      return
+    }
+    writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome, appearance })
+  })
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
 })
 
