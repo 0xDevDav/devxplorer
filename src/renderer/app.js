@@ -2148,6 +2148,9 @@ function bindEvents() {
   api.onCloseViewer(closeViewer)
   // Picks up changes made by other programs while the window was in the background.
   window.addEventListener('focus', refresh)
+  // Selections turn grey while the window is in the background, as on macOS.
+  window.addEventListener('focus', () => document.body.classList.remove('inactive'))
+  window.addEventListener('blur', () => document.body.classList.add('inactive'))
 }
 
 /*

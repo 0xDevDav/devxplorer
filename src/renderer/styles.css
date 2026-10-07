@@ -4,6 +4,9 @@
   --size: 170px;
   --row-size: 52px;
   --ease: cubic-bezier(.2, .8, .2, 1);
+  --r-sm: 6px; /* buttons, fields, chips, menu items */
+  --r-md: 10px; /* rows, panels, popovers */
+  --r-lg: 14px; /* sheets and cards */
   --fast: .12s;
   --normal: .2s;
 
@@ -104,7 +107,7 @@
 
 /* keyboard focus: an accent ring like macOS, never shown for mouse clicks */
 :focus { outline: none }
-:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 2px; border-radius: 6px }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 2px; border-radius: var(--r-sm) }
 input:focus-visible, .path-input:focus-visible { outline: none }
 
 /*
@@ -133,7 +136,7 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 }
 ::-webkit-scrollbar { width: 10px; height: 10px; background: transparent }
 ::-webkit-scrollbar-corner { background: transparent }
-::-webkit-scrollbar-thumb { background-color: transparent; background-clip: padding-box; border: 3px solid transparent; border-radius: 10px }
+::-webkit-scrollbar-thumb { background-color: transparent; background-clip: padding-box; border: 3px solid transparent; border-radius: var(--r-md) }
 :hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar) }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--muted) }
 
@@ -170,16 +173,16 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
   max-width: 200px;
   height: 34px;
   padding: 0 6px 0 14px;
-  border-radius: 9px 9px 0 0;
+  border-radius: var(--r-md) var(--r-md) 0 0;
   color: var(--muted);
 }
 .tab:hover { background: var(--hover); color: var(--text) }
 .tab.on { background: var(--panel); color: var(--text) }
 .tab span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.tab button { flex: none; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; background: none; border: 0; border-radius: 5px; color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; cursor: pointer }
+.tab button { flex: none; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; background: none; border: 0; border-radius: var(--r-sm); color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; cursor: pointer }
 .tab:hover button, .tab.on button { opacity: 1 }
 .tab button:hover { background: var(--hover-strong); color: var(--text) }
-.new-tab { -webkit-app-region: no-drag; align-self: center; display: grid; place-items: center; width: 28px; height: 28px; margin-left: 4px; background: none; border: 0; border-radius: 7px; color: var(--muted); font-size: 18px; cursor: pointer }
+.new-tab { -webkit-app-region: no-drag; align-self: center; display: grid; place-items: center; width: 28px; height: 28px; margin-left: 4px; background: none; border: 0; border-radius: var(--r-sm); color: var(--muted); font-size: 18px; cursor: pointer }
 .new-tab:hover { background: var(--hover-strong); color: var(--text) }
 
 /* ---------- toolbar ---------- */
@@ -194,23 +197,23 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 #crumbs .crumb-more { flex: none; letter-spacing: 1px }
 #crumbs { cursor: text }
 #crumbs button { cursor: pointer }
-.path-input { flex: 1; min-width: 0; padding: 5px 10px; background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 0 0 3px var(--accent-soft); outline: none }
-#crumbs button { padding: 4px 8px; background: none; border: 0; border-radius: 6px; color: var(--muted); white-space: nowrap; cursor: pointer }
+.path-input { flex: 1; min-width: 0; padding: 5px 10px; background: var(--bg); border: 1px solid var(--accent); border-radius: var(--r-md); box-shadow: 0 0 0 3px var(--accent-soft); outline: none }
+#crumbs button { padding: 4px 8px; background: none; border: 0; border-radius: var(--r-sm); color: var(--muted); white-space: nowrap; cursor: pointer }
 #crumbs button:last-of-type { color: var(--text); font-weight: 600 }
 #crumbs button:hover { background: var(--panel2); color: var(--text) }
 #crumbs .sep { width: 12px; height: 12px; color: var(--faint) }
 
 .search { position: relative; display: flex; flex: 0 1 220px !important; align-items: center; min-width: 110px }
 .search .icon { position: absolute; left: 9px; width: 14px; height: 14px; color: var(--muted); pointer-events: none }
-#q { width: 100%; padding: 5px 10px 5px 29px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast), box-shadow var(--fast) }
+#q { width: 100%; padding: 5px 10px 5px 29px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); outline: none; transition: border-color var(--fast), box-shadow var(--fast) }
 #q:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft) }
 #q::-webkit-search-cancel-button { display: none }
 
-.popup { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; cursor: pointer }
+.popup { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); white-space: nowrap; cursor: pointer }
 .popup:hover { border-color: var(--line-strong) }
 .popup .icon { width: 12px; height: 12px; color: var(--muted) }
 .popup .lead { display: none; width: 15px; height: 15px; color: var(--text-soft) }
-#settingsBtn { display: grid; place-items: center; width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer }
+#settingsBtn { display: grid; place-items: center; width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: var(--r-md); color: var(--muted); font-size: 16px; cursor: pointer }
 #settingsBtn:hover { background: var(--panel2); border-color: var(--line); color: var(--text) }
 
 /* ---------- places bar: favorites, drives, extension filters ---------- */
@@ -231,7 +234,7 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 .place-group { display: flex; align-items: center; gap: 2px }
 .divider { flex: none; width: 1px; height: 20px; margin: 0 8px; background: var(--line) }
 
-.place { display: flex; align-items: center; gap: 7px; padding: 5px 11px 5px 8px; background: none; border: 0; border-radius: 8px; color: var(--text-soft); white-space: nowrap; cursor: pointer }
+.place { display: flex; align-items: center; gap: 7px; padding: 5px 11px 5px 8px; background: none; border: 0; border-radius: var(--r-md); color: var(--text-soft); white-space: nowrap; cursor: pointer }
 .place:hover { background: var(--hover-strong); color: var(--text) }
 .place.active { background: var(--panel2); color: var(--text-strong); font-weight: 600 }
 
@@ -286,7 +289,7 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 .filter-group { display: flex; align-items: center; gap: 2px }
 
 /* filter items read like Finder tags: colored dot and name, soft background when active */
-.chip { display: flex; align-items: center; gap: 7px; padding: 5px 10px; white-space: nowrap; background: none; border: 0; border-radius: 8px; color: var(--text-soft); cursor: pointer }
+.chip { display: flex; align-items: center; gap: 7px; padding: 5px 10px; white-space: nowrap; background: none; border: 0; border-radius: var(--r-md); color: var(--text-soft); cursor: pointer }
 .chip:hover { background: var(--hover-strong); color: var(--text) }
 .chip.on { background: var(--panel2); color: var(--text-strong); font-weight: 600 }
 .chip .dot { width: 9px; height: 9px }
@@ -307,11 +310,13 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 #splitter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: transparent; transition: background-color var(--fast), box-shadow var(--fast) }
 #splitter:hover::after, #splitter.active::after { background: var(--accent); box-shadow: 0 0 0 1px var(--accent) }
 #folders[hidden] + #splitter { display: none }
-.frow { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 10px; cursor: pointer }
+.frow { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: var(--r-md); cursor: pointer }
 .frow + .frow { margin-top: 2px }
 .frow:hover { background: var(--panel) }
-.frow.focus { background: var(--panel2); box-shadow: inset 3px 0 var(--accent) }
-.frow.sel { background: var(--accent-soft) }
+.frow.focus { background: var(--panel2) }
+.frow.sel { color: var(--on-accent); background: var(--accent) }
+.frow.sel .fname, .frow.sel .fcount { color: inherit }
+body.inactive .frow.sel { color: var(--text); background: var(--line-strong) }
 .frow.dim .collage, .frow.dim .fname { opacity: .4 }
 .finfo { flex: 1; min-width: 0 }
 .finfo .badges { margin-top: 4px }
@@ -340,10 +345,10 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 .pane-head { display: flex; align-items: center; gap: 12px; margin: 0 4px 14px }
 .pane-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; min-width: 0 }
 .pane-title h2 { margin: 0; font-size: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.ghost { margin-left: auto; padding: 6px 12px; background: none; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); white-space: nowrap; cursor: pointer }
+.ghost { margin-left: auto; padding: 6px 12px; background: none; border: 1px solid var(--line); border-radius: var(--r-md); color: var(--muted); white-space: nowrap; cursor: pointer }
 .ghost:hover { background: var(--panel); color: var(--text) }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--size), 1fr)); gap: 12px; padding: 4px; border-radius: 12px }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--size), 1fr)); gap: 12px; padding: 4px; border-radius: var(--r-lg) }
 
 /* group separators stick to the top of the pane while their group is in view */
 .group-head {
@@ -372,21 +377,23 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 .group-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .24s var(--ease), opacity .24s var(--ease) }
 .group-body > div { min-height: 0; overflow: hidden }
 .group-body.collapsed { grid-template-rows: 0fr; opacity: 0 }
-.item { padding: 6px; border-radius: 12px }
+.item { padding: 6px; border-radius: var(--r-lg) }
 .item:hover { background: var(--panel) }
-.item.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent) }
+.item.sel { background: var(--hover-strong) }
+.item.sel .name { color: var(--on-accent); background: var(--accent) }
+body.inactive .item.sel .name { color: var(--text); background: var(--line-strong) }
 .item.dim .thumb { opacity: .4 }
 .item.cut, .frow.cut { opacity: .45 }
 .item.folder .collage { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0 }
 .item.folder .name { font-weight: 600; color: var(--text) }
 .item.folder .fcount { padding: 0 2px }
-.name { margin-top: 6px; padding: 0 2px; font-size: 12px; color: var(--text-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.name { width: fit-content; max-width: 100%; margin-top: 6px; padding: 1px 6px; border-radius: var(--r-sm); font-size: 12px; color: var(--text-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 
 /* Cards off screen are neither laid out nor painted; folders with thousands of files stay smooth. */
 #content .item { content-visibility: auto; contain-intrinsic-size: auto 200px auto 260px }
-.thumb { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 9px; background: var(--panel2) }
+.thumb { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: calc(var(--r-lg) - 6px); background: var(--panel2) }
 .thumb img { display: block; width: 100%; height: 100%; object-fit: cover }
-.thumb .ext { position: absolute; left: 7px; bottom: 7px; padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 1.3; letter-spacing: .04em; text-transform: uppercase; color: #fff; background: #0000008c; backdrop-filter: blur(8px); border-radius: 5px; pointer-events: none }
+.thumb .ext { position: absolute; left: 7px; bottom: 7px; padding: 2px 6px; font-size: 10px; font-weight: 600; line-height: 1.3; letter-spacing: .04em; text-transform: uppercase; color: #fff; background: #0000008c; backdrop-filter: blur(8px); border-radius: var(--r-sm); pointer-events: none }
 .thumb:has(> .doc) .ext { display: none }
 .thumb .badges { position: absolute; top: 6px; left: 6px; right: 6px }
 img:not([src]) { visibility: hidden }
@@ -412,7 +419,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 .app-icon.shortcut .glyph::after { position: absolute; left: 0; bottom: 0; width: max(16px, 24%); aspect-ratio: 1; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 11 11 5M6.5 5H11v4.5' fill='none' stroke='%23111' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 75% no-repeat; border-radius: 22%; box-shadow: 0 1px 3px #0006; content: '' }
 .app-icon:not(.instant), .paper:not(.instant) { animation: fade-in var(--normal) ease-out }
 
-.thumb .play { position: absolute; right: 7px; bottom: 7px; display: grid; place-items: center; width: 24px; height: 17px; padding: 0; color: #fff; background: #0000008c; backdrop-filter: blur(8px); border-radius: 5px; pointer-events: none }
+.thumb .play { position: absolute; right: 7px; bottom: 7px; display: grid; place-items: center; width: 24px; height: 17px; padding: 0; color: #fff; background: #0000008c; backdrop-filter: blur(8px); border-radius: var(--r-sm); pointer-events: none }
 .thumb .play svg { width: 11px; height: 11px }
 /* hover playback inside the card */
 .thumb .live { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--normal) var(--ease) }
@@ -439,12 +446,12 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   background: var(--surface);
   backdrop-filter: blur(16px);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   box-shadow: var(--shadow);
   transform-origin: left top;
 }
 #menu:not([hidden]) { animation: pop-in var(--fast) var(--ease) }
-#menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px; background: none; border: 0; border-radius: 5px; text-align: left; cursor: default; transition: none }
+#menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px; background: none; border: 0; border-radius: var(--r-sm); text-align: left; cursor: default; transition: none }
 #menu button:hover, #menu button.active { background: var(--accent); color: var(--on-accent) }
 #menu button:hover kbd { color: var(--on-accent); opacity: .75 }
 #menu button.danger:hover { background: var(--danger); color: #fff }
@@ -488,11 +495,11 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 }
 #viewer.show { opacity: 1; visibility: visible; transition-delay: 0s }
 #viewer.show > :first-child { animation: zoom-in .24s var(--ease) }
-#viewer > img, #viewer > video { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: 8px }
-#viewer iframe.doc { width: min(1100px, 100%); height: 100%; background: #fff; border: 0; border-radius: 8px }
+#viewer > img, #viewer > video { max-width: 100%; max-height: 100%; min-height: 0; object-fit: contain; border-radius: var(--r-md) }
+#viewer iframe.doc { width: min(1100px, 100%); height: 100%; background: #fff; border: 0; border-radius: var(--r-md) }
 #viewer .other { display: flex; flex-direction: column; align-items: center; gap: 14px }
 #viewer .other .name { font-size: 15px; color: var(--text) }
-#viewer .other button { padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
+#viewer .other button { padding: 8px 16px; border: 1px solid var(--line); border-radius: var(--r-md); cursor: pointer }
 /*
  * The bar sits in the 40px band under the native window controls, like a title bar: it can drag
  * the window, stays above a zoomed image and leaves room on the right for the controls.
@@ -538,7 +545,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   background: color-mix(in srgb, var(--panel) 88%, transparent);
   backdrop-filter: blur(20px);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   box-shadow: 0 12px 40px #0008;
   animation: pop-in var(--normal) var(--ease);
 }
@@ -547,7 +554,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 .info-panel dt { color: var(--muted) }
 .info-panel dd { margin: 0; color: var(--text); overflow-wrap: anywhere }
 .matte-switch button { padding: 6px 8px }
-.matte-sample { display: block; width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px #ffffff40 }
+.matte-sample { display: block; width: 16px; height: 16px; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px #ffffff40 }
 [data-matte="dark"] .matte-sample { background: #000 }
 [data-matte="light"] .matte-sample { background: #fff }
 [data-matte="checker"] .matte-sample { background: repeating-conic-gradient(#c8c8ce 0 25%, #fff 0 50%) 50% / 8px 8px }
@@ -555,7 +562,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 /* rich previews: text, code, tables, markdown, html */
 .rich { display: flex; flex-direction: column; gap: 10px; width: min(1200px, 100%); height: 100%; min-height: 0 }
 .rich-switch { align-self: center; margin: 0 }
-.rich-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px }
+.rich-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md) }
 .rich-caption { text-align: center; font-size: 12px; color: var(--muted) }
 
 .textview { margin: 0; padding: 24px 28px; font: 13px/1.6 Consolas, "Cascadia Mono", monospace; white-space: pre-wrap; word-break: break-word }
@@ -586,14 +593,14 @@ table.csv thead .rownum { z-index: 2; background: var(--panel2) }
 .markdown h1, .markdown h2, .markdown h3, .markdown h4 { margin: 1.4em 0 .5em; line-height: 1.25; color: var(--text) }
 .markdown h1 { font-size: 30px } .markdown h2 { font-size: 23px } .markdown h3 { font-size: 18px }
 .markdown h1:first-child, .markdown h2:first-child { margin-top: 0 }
-.markdown code { padding: .1em .4em; font: .9em Consolas, monospace; background: #ffffff12; border-radius: 5px }
-.markdown pre.code { margin: 0; padding: 14px 18px; overflow: auto; font: 13px/1.6 Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px }
+.markdown code { padding: .1em .4em; font: .9em Consolas, monospace; background: #ffffff12; border-radius: var(--r-sm) }
+.markdown pre.code { margin: 0; padding: 14px 18px; overflow: auto; font: 13px/1.6 Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md) }
 
 /* fenced code blocks: language label on the left, copy button on the right while hovered */
 .code-block { position: relative; margin: 1em 0 }
 .code-block:not([data-language=""])::before { content: attr(data-language); position: absolute; top: 9px; left: 18px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
 .code-block:not([data-language=""]) pre.code { padding-top: 32px }
-.copy-code { position: absolute; top: 7px; right: 7px; display: flex; align-items: center; gap: 6px; padding: 4px 9px; font-size: 12px; color: var(--text-soft); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; opacity: 0; transition: opacity var(--fast), color var(--fast), border-color var(--fast) }
+.copy-code { position: absolute; top: 7px; right: 7px; display: flex; align-items: center; gap: 6px; padding: 4px 9px; font-size: 12px; color: var(--text-soft); background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; opacity: 0; transition: opacity var(--fast), color var(--fast), border-color var(--fast) }
 .code-block:hover .copy-code, .copy-code:focus-visible, .copy-code.done { opacity: 1 }
 .copy-code:hover { color: var(--text); border-color: var(--line-strong) }
 .copy-code.done { color: var(--c-green) }
@@ -622,23 +629,23 @@ table.csv thead .rownum { z-index: 2; background: var(--panel2) }
 #viewer.controls-idle, #viewer.controls-idle * { cursor: none }
 
 /* 3D model viewer */
-.mesh-view { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 10px; background: radial-gradient(ellipse at 50% 35%, #2c2c3a, #0d0d10 75%) }
+.mesh-view { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: var(--r-md); background: radial-gradient(ellipse at 50% 35%, #2c2c3a, #0d0d10 75%) }
 .mesh-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none }
 .mesh-canvas:active { cursor: grabbing }
 .mesh-status { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted) }
-.mesh-caption { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 12px; font-size: 12px; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; background: #000000a0; backdrop-filter: blur(8px); border-radius: 8px; pointer-events: none }
+.mesh-caption { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 12px; font-size: 12px; color: var(--text-soft); white-space: nowrap; font-variant-numeric: tabular-nums; background: #000000a0; backdrop-filter: blur(8px); border-radius: var(--r-md); pointer-events: none }
 
 /* ---------- dialogs ---------- */
 
-dialog { width: 440px; padding: 20px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow) }
+dialog { width: 440px; padding: 20px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow) }
 dialog[open] { animation: pop-in var(--normal) var(--ease) }
 dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px) }
 dialog[open]::backdrop { animation: fade-in var(--normal) ease-out }
 dialog > form > label { display: block; margin-bottom: 10px; color: var(--muted) }
-dialog input:not([type]) { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast) }
+dialog input:not([type]) { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md); outline: none; transition: border-color var(--fast) }
 dialog input:not([type]):focus { border-color: var(--accent) }
 dialog menu { display: flex; flex-direction: row-reverse; gap: 8px; margin: 16px 0 0; padding: 0 }
-dialog menu button { padding: 6px 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer }
+dialog menu button { padding: 6px 14px; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r-md); cursor: pointer }
 
 /*
  * Settings in the style of macOS System Settings: a sidebar of panes with colored tiles, and
@@ -648,10 +655,10 @@ dialog menu button { padding: 6px 14px; background: var(--panel2); border: 1px s
 #settings { width: min(1100px, calc(100vw - 80px)); max-width: none; height: min(760px, calc(100vh - 80px)); max-height: none; padding: 0; overflow: hidden }
 #settings form { display: grid; grid-template-columns: 230px 1fr; height: 100% }
 .settings-nav { display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; background: var(--bg); border-right: 1px solid var(--line) }
-.settings-nav button { display: flex; align-items: center; gap: 10px; padding: 6px 8px; text-align: left; white-space: nowrap; color: var(--text); background: none; border: 0; border-radius: 7px; cursor: pointer }
+.settings-nav button { display: flex; align-items: center; gap: 10px; padding: 6px 8px; text-align: left; white-space: nowrap; color: var(--text); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer }
 .settings-nav button:hover { background: var(--panel2) }
 .settings-nav button.on { color: var(--on-accent); background: var(--accent) }
-.tile { display: grid; place-items: center; flex: none; width: 22px; height: 22px; color: #fff; border-radius: 6px; box-shadow: inset 0 0 0 .5px #0000001f }
+.tile { display: grid; place-items: center; flex: none; width: 22px; height: 22px; color: #fff; border-radius: var(--r-sm); box-shadow: inset 0 0 0 .5px #0000001f }
 .tile .icon { width: 14px; height: 14px }
 .tile.gray { background: linear-gradient(#a1a1a8, #7c7c84) }
 .tile.blue { background: linear-gradient(#3b9bff, #0a6cf0) }
@@ -663,7 +670,7 @@ dialog menu button { padding: 6px 14px; background: var(--panel2); border: 1px s
 .pane:not(.on) { display: none }
 .pane h2 { margin: 0 0 16px; font-size: 20px }
 .pane .lead { margin: -8px 0 12px }
-.set-group { margin-bottom: 16px; background: var(--panel2); border-radius: 10px }
+.set-group { margin-bottom: 16px; background: var(--panel2); border-radius: var(--r-md) }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding: 8px 14px }
 .set-row + .set-row { border-top: 1px solid var(--line) }
 .set-row > div:first-child { flex: 1; min-width: 0 }
@@ -673,11 +680,11 @@ label.set-row { cursor: pointer }
 .set-row .segmented { flex: none; margin: 0 }
 .set-row .swatches { margin: 0; padding: 4px }
 .set-actions { display: flex; flex: none; gap: 8px }
-.set-actions button { padding: 5px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; cursor: pointer }
+.set-actions button { padding: 5px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer }
 .set-actions button:hover { border-color: var(--muted) }
 .set-label { margin: 0 0 6px 14px; font-size: 12px; font-weight: 600; color: var(--muted) }
 .keys { display: flex; flex: none; align-items: center; gap: 4px; color: var(--muted); font-size: 12px }
-.keycap { min-width: 22px; padding: 2px 6px; font-family: inherit; font-size: 11.5px; font-weight: 500; line-height: 1.4; text-align: center; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px }
+.keycap { min-width: 22px; padding: 2px 6px; font-family: inherit; font-size: 11.5px; font-weight: 500; line-height: 1.4; text-align: center; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r-sm) }
 .settings-body menu { margin: 0; padding: 12px 36px 20px }
 @media (max-width: 640px) {
   #settings form { grid-template-columns: 1fr; grid-template-rows: auto 1fr }
@@ -691,7 +698,7 @@ label.set-row { cursor: pointer }
 #paletteInput { width: 100%; padding: 16px 20px; font-size: 17px; background: none; border: 0; border-bottom: 1px solid var(--line); outline: none }
 #paletteList { max-height: 420px; padding: 6px; overflow: auto }
 #paletteList > .hint { padding: 14px }
-.palette-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; cursor: default }
+.palette-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--r-md); cursor: default }
 .palette-row .icon { width: 20px; height: 20px; color: var(--folder) }
 .palette-row.on { background: var(--accent); color: var(--on-accent) }
 .palette-row.on .icon, .palette-row.on small, .palette-row.on .palette-kind { color: var(--on-accent) }
@@ -706,8 +713,8 @@ label.set-row { cursor: pointer }
 .swatch:hover { transform: scale(1.1) }
 .swatch.on { box-shadow: inset 0 0 0 1px #00000026, 0 0 0 2px var(--panel), 0 0 0 4px var(--swatch) }
 
-.segmented { display: inline-flex; gap: 2px; margin-top: 10px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px }
-.segmented button { padding: 6px 16px; background: none; border: 0; border-radius: 7px; color: var(--muted); cursor: pointer }
+.segmented { display: inline-flex; gap: 2px; margin-top: 10px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md) }
+.segmented button { padding: 6px 16px; background: none; border: 0; border-radius: var(--r-sm); color: var(--muted); cursor: pointer }
 .segmented button:hover { color: var(--text) }
 .segmented button.on { background: var(--panel2); color: var(--text); box-shadow: 0 1px 2px #0000001a }
 
@@ -717,10 +724,10 @@ input:checked + .switch { background: var(--accent) }
 input:checked + .switch::after { transform: translateX(16px) }
 
 /* macOS-style tooltip bubble, shown near the pointer */
-#tooltip { position: fixed; z-index: 50; max-width: 380px; padding: 5px 9px; font-size: 12px; line-height: 1.4; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; background: var(--surface); backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 6px 22px #0006; pointer-events: none; opacity: 0; transform: translateY(-3px); transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease) }
+#tooltip { position: fixed; z-index: 50; max-width: 380px; padding: 5px 9px; font-size: 12px; line-height: 1.4; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; background: var(--surface); backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: var(--r-sm); box-shadow: 0 6px 22px #0006; pointer-events: none; opacity: 0; transform: translateY(-3px); transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease) }
 #tooltip.show { opacity: 1; transform: none }
 
-#toast { position: fixed; z-index: 30; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 16px; background: var(--toast-bg); border: 1px solid var(--danger); border-radius: 10px; box-shadow: var(--shadow) }
+#toast { position: fixed; z-index: 30; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 10px 16px; background: var(--toast-bg); border: 1px solid var(--danger); border-radius: var(--r-md); box-shadow: var(--shadow) }
 #toast:not([hidden]) { animation: rise-in var(--normal) var(--ease) }
 #toast.info { background: var(--panel); border-color: var(--line-strong) }
 
