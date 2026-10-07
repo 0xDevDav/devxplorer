@@ -257,6 +257,28 @@ async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
 
 /* ========== main view: folder list + content pane ========== */
 
+/*
+ * Entering a folder plays a cascade: the folder list fades in, its rows slide in one after
+ * another, then the content pane follows. cascadeBase delays the whole sequence, e.g. until the
+ * hover preview has grown into the content area. Refreshing the same folder does not replay it.
+ */
+const EASE = 'cubic-bezier(.2, .8, .2, 1)'
+const CASCADE_STEP_MS = 30
+const CASCADE_MAX_STEPS = 12
+const CASCADE_ROW_MS = 320
+let cascadeBase = 0
+let contentDelay = 0
+
+function playCascade(pane, rows) {
+  if (reducedMotion.matches) return
+  pane.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: cascadeBase, easing: 'ease-out', fill: 'backwards' })
+  rows.forEach((row, i) => row.animate(
+    [{ opacity: 0, transform: 'translateX(-12px)' }, { opacity: 1, transform: 'none' }],
+    { duration: CASCADE_ROW_MS, delay: cascadeBase + Math.min(i, CASCADE_MAX_STEPS) * CASCADE_STEP_MS, easing: EASE, fill: 'backwards' },
+  ))
+  contentDelay = cascadeBase + Math.min(rows.length, 4) * CASCADE_STEP_MS
+}
+
 let renderId = 0
 async function render() {
   if (!state.cwd) return
@@ -279,17 +301,22 @@ async function render() {
     if (id !== renderId) return
     const folders = sorted(data.folders).filter(nameMatches)
     const here = { name: 'File in questa cartella', path: state.cwd, self: true }
+    const pane = $('#folders')
+    const entering = !samePath(pane.dataset.cwd, state.cwd)
+    pane.dataset.cwd = state.cwd
     if (!folders.length) {
-      $('#folders').hidden = true
+      pane.hidden = true
+      if (entering) contentDelay = cascadeBase
       await renderPane({ ...here, name: baseName(state.cwd) }, data)
     } else {
       const entries = data.files.length ? [here, ...folders] : folders
       if (!entries.some(e => samePath(e.path, state.focus))) setFocus(entries[0].path)
-      const pane = $('#folders')
       const scroll = pane.scrollTop
-      pane.replaceChildren(...entries.map(folderRow))
+      const rows = entries.map(folderRow)
+      pane.replaceChildren(...rows)
       pane.hidden = false
       pane.scrollTop = scroll
+      if (entering) playCascade(pane, rows)
       const focused = entries.find(e => samePath(e.path, state.focus))
       await renderPane(focused, focused.self ? data : null)
     }
@@ -357,8 +384,9 @@ function showContent(path, nodes) {
   content.scrollTop = samePane ? scroll : 0
   if (!samePane && !reducedMotion.matches) {
     content.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
-      { duration: 180, easing: 'cubic-bezier(.2, .8, .2, 1)' })
+      { duration: 220, delay: contentDelay, easing: EASE, fill: 'backwards' })
   }
+  contentDelay = 0
 }
 
 function grid(folders, files, dir) {
@@ -834,7 +862,9 @@ async function openPeekedFolder() {
   peek.classList.add('expanding')
   Object.assign(peek.style, { left: area.left + 'px', top: area.top + 'px', width: area.width + 'px', height: area.height + 'px' })
   $('#dim').classList.remove('show')
+  cascadeBase = PEEK_EXPAND_MS
   await Promise.all([navigate(peek.dataset.dir), new Promise(r => setTimeout(r, PEEK_EXPAND_MS))])
+  cascadeBase = 0
   peek.classList.remove('show')
   setTimeout(() => { if (!peekOpen()) peek.classList.remove('expanding') }, FADE_MS)
 }
