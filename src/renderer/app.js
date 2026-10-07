@@ -464,18 +464,23 @@ async function loadPreview(path, type) {
   return text != null ? { text } : {}
 }
 
+// Loaded previews, keyed by path and modification time. Bounded (oldest dropped first); a
+// thumbnail that came back empty is not kept, so a transient shell failure is retried next time.
+const PREVIEW_CACHE_LIMIT = 3000
 const previews = new Map()
-const loadedPreviews = new Set()
 const previewObserver = new IntersectionObserver(entries => entries.forEach(async entry => {
   if (!entry.isIntersecting) return
   previewObserver.unobserve(entry.target)
   const img = entry.target
   const key = img.dataset.src + '|' + img.dataset.mtime
-  if (!previews.has(key)) previews.set(key, loadPreview(img.dataset.src, img.dataset.type))
   // Only the first appearance fades in; re-renders show cached previews immediately.
-  const instant = loadedPreviews.has(key)
+  const instant = previews.has(key)
+  if (!instant) {
+    if (previews.size >= PREVIEW_CACHE_LIMIT) previews.delete(previews.keys().next().value)
+    previews.set(key, loadPreview(img.dataset.src, img.dataset.type))
+  }
   const preview = await previews.get(key)
-  loadedPreviews.add(key)
+  if (img.dataset.type !== 'file' && !preview.img) previews.delete(key)
   let node = img
   if (preview.icon) img.replaceWith(node = appIcon(img.dataset.src, preview.icon))
   else if (preview.text != null) img.replaceWith(node = el('div', 'paper', preview.text.slice(0, 600)))
@@ -510,12 +515,39 @@ const countLabel = data => [
 ].filter(Boolean).join(' · ') || t('count.empty')
 
 // Fills a 2x2 collage with the first files of a folder; runs after the row is on screen.
-async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
-  const data = await list(path)
-  countEl.textContent = filesOnly ? t.n('count.files', data.files.length) : countLabel(data)
-  const files = sorted(data.files).slice(0, 4)
-  if (files.length) collage.append(...files.map(previewImg))
-  else collage.replaceChildren(icon('folderFill', 'finder-folder'))
+/*
+ * Folder previews (collage and item count) are filled when they scroll into view. A listing is
+ * reused while the folder's modification time is unchanged, which Windows moves whenever entries
+ * are added, removed or renamed; the open folder itself has no known time and is always listed.
+ */
+const FOLDER_CACHE_LIMIT = 1000
+const folderListings = new Map()
+
+function folderListing(folder) {
+  if (folder.mtime == null) return list(folder.path)
+  const key = `${folder.path}|${folder.mtime}|${needsPhotoDates()}`
+  if (!folderListings.has(key)) {
+    if (folderListings.size >= FOLDER_CACHE_LIMIT) folderListings.delete(folderListings.keys().next().value)
+    folderListings.set(key, list(folder.path))
+  }
+  return folderListings.get(key)
+}
+
+const folderObserver = new IntersectionObserver(entries => entries.forEach(entry => {
+  if (!entry.isIntersecting) return
+  folderObserver.unobserve(entry.target)
+  entry.target.fill()
+}), { rootMargin: '300px' })
+
+function fillFolderPreview(folder, collage, countEl, filesOnly = false) {
+  collage.fill = async () => {
+    const data = await folderListing(folder)
+    countEl.textContent = filesOnly ? t.n('count.files', data.files.length) : countLabel(data)
+    const files = sorted(data.files).slice(0, 4)
+    if (files.length) collage.append(...files.map(previewImg))
+    else collage.replaceChildren(icon('folderFill', 'finder-folder'))
+  }
+  folderObserver.observe(collage)
 }
 
 /* ========== main view: folder list + content pane ========== */
@@ -599,7 +631,7 @@ function folderRow(entry) {
   info.append(el('div', 'fname', entry.name), count)
   if (!entry.self) info.append(badges(entry.path))
   row.append(collage, info)
-  fillFolderPreview(entry.path, collage, count, entry.self)
+  fillFolderPreview(entry, collage, count, entry.self)
 
   row.addEventListener('click', e => { if (!e.ctrlKey && !e.shiftKey) focusEntry(entry) })
   dropTarget(row, entry.path)
@@ -780,7 +812,7 @@ function folderTile(folder) {
   thumb.append(collage, badges(folder.path))
   tile.append(thumb, el('div', 'name', folder.name), count)
   tile.title = folder.path
-  fillFolderPreview(folder.path, collage, count)
+  fillFolderPreview(folder, collage, count)
   selectable(tile, folder.path, true)
   tile.addEventListener('dblclick', () => navigate(folder.path))
   dropTarget(tile, folder.path)
