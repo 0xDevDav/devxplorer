@@ -295,10 +295,19 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-soft);
+  cursor: pointer;
 }
 .group-head:first-child { margin-top: 0 }
+.group-head:hover { color: var(--text) }
 .group-head small { font-weight: 400; color: var(--muted) }
 .group-head::after { content: ""; flex: 1; height: 1px; margin-left: 6px; background: var(--line) }
+.group-head .chev { width: 12px; font-size: 14px; line-height: 1; text-align: center; color: var(--muted); transform: rotate(90deg); transition: transform var(--normal) var(--ease) }
+.group-head.collapsed .chev { transform: none }
+
+/* collapsing animates the row track from its content height to zero */
+.group-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .24s var(--ease), opacity .24s var(--ease) }
+.group-body > div { min-height: 0; overflow: hidden }
+.group-body.collapsed { grid-template-rows: 0fr; opacity: 0 }
 .item { padding: 6px; border-radius: 12px }
 .item:hover { background: var(--panel) }
 .item.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent) }

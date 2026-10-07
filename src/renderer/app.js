@@ -435,10 +435,29 @@ function groupFiles(files) {
   return [...groups.keys()].sort(grouping.compare).map(key => ({ label: grouping.label(key), files: groups.get(key) }))
 }
 
-function groupHead(label, count) {
+// Collapsed groups are remembered by grouping and label, so e.g. "Altro" stays collapsed in every folder.
+const collapsedGroups = new Set(store.get('collapsedGroups', []))
+
+function groupSection(label, count, content) {
+  const id = state.group + ':' + label
   const head = el('div', 'group-head')
-  head.append(el('span', '', label), el('small', '', count))
-  return head
+  const body = el('div', 'group-body')
+  const inner = el('div')
+  head.append(el('span', 'chev', '›'), el('span', '', label), el('small', '', count))
+  inner.append(content)
+  body.append(inner)
+  const apply = () => {
+    const collapsed = collapsedGroups.has(id)
+    head.classList.toggle('collapsed', collapsed)
+    body.classList.toggle('collapsed', collapsed)
+  }
+  head.onclick = () => {
+    collapsedGroups.has(id) ? collapsedGroups.delete(id) : collapsedGroups.add(id)
+    store.set('collapsedGroups', [...collapsedGroups])
+    apply()
+  }
+  apply()
+  return [head, body]
 }
 
 function grid(folders, files, dir) {
@@ -454,8 +473,8 @@ function grid(folders, files, dir) {
   if (!groups[0]?.label) return block(files, folders)
 
   const root = el('div', 'groups')
-  if (folders.length) root.append(groupHead('Cartelle', folders.length), block([], folders))
-  for (const g of groups) root.append(groupHead(g.label, g.files.length), block(g.files))
+  if (folders.length) root.append(...groupSection('Cartelle', folders.length, block([], folders)))
+  for (const g of groups) root.append(...groupSection(g.label, g.files.length, block(g.files)))
   return root
 }
 
@@ -538,7 +557,8 @@ function fileCard(file, siblings) {
 
 /* ========== selection ========== */
 
-const visiblePaths = () => $$('#main [data-path]').map(n => n.dataset.path)
+const isShown = node => !node.closest('.group-body.collapsed')
+const visiblePaths = () => $$('#main [data-path]').filter(isShown).map(n => n.dataset.path)
 const selectedInOrder = () => [...new Set(visiblePaths().filter(p => state.selection.has(p)))]
 
 function selectable(node, path, isFolder) {
@@ -992,7 +1012,7 @@ function bindEvents() {
     else if (e.key === 'F2' && selected.length) renameSelection()
     else if (e.key === 'a' && e.ctrlKey) {
       e.preventDefault()
-      $$('#content [data-path]').forEach(n => state.selection.add(n.dataset.path))
+      $$('#content [data-path]').filter(isShown).forEach(n => state.selection.add(n.dataset.path))
       paintSelection()
     } else if (e.key === 'Escape') clearSelection()
   })
