@@ -160,9 +160,11 @@ async function attachPhotoDates(files) {
   photos.forEach((f, i) => { f.taken = dates[i] ?? null })
 }
 
-function toast(message) {
+// kind: "error" (default, used for failures reported by the main process) or "info"
+function toast(message, kind = 'error') {
   const box = $('#toast')
   box.textContent = message
+  box.className = kind
   box.hidden = false
   clearTimeout(toast.timer)
   toast.timer = setTimeout(() => { box.hidden = true }, 4000)
@@ -341,13 +343,13 @@ function openSettings() {
 
 async function exportLibrary() {
   const count = await call('exportLibrary')
-  if (count != null) toast(t('data.exported', { n: count }))
+  if (count != null) toast(t('data.exported', { n: count }), 'info')
 }
 
 async function importLibrary() {
   const count = await call('importLibrary')
   if (count == null) return
-  toast(t('data.imported', { n: count }))
+  toast(t('data.imported', { n: count }), 'info')
   refresh()
 }
 
@@ -705,7 +707,7 @@ function fileCard(file, siblings) {
     const dir = parentDir(file.path)
     if (!paths.length) return
     if (paths.every(p => samePath(parentDir(p), dir))) await reorder(dir, paths, file.path, insertAfter)
-    else await call('move', paths, dir)
+    else await moveItems(paths, dir)
     refresh()
   })
   return card
@@ -758,7 +760,11 @@ function clearSelection() {
 }
 
 function paintSelection() {
-  $$('#main [data-path]').forEach(n => n.classList.toggle('sel', state.selection.has(n.dataset.path)))
+  const cut = new Set(clipboard?.cut ? clipboard.paths : [])
+  for (const node of $$('#main [data-path]')) {
+    node.classList.toggle('sel', state.selection.has(node.dataset.path))
+    node.classList.toggle('cut', cut.has(node.dataset.path))
+  }
   renderStatus()
 }
 
@@ -807,8 +813,84 @@ function dropTarget(node, dir) {
     e.stopPropagation()
     node.classList.remove('target')
     const paths = droppedPaths(e)
-    if (paths.length) { await call('move', paths, dir); refresh() }
+    if (paths.length) { await moveItems(paths, dir); refresh() }
   })
+}
+
+/* ========== undoable operations ========== */
+
+// Every change to files goes through these helpers, which record how to revert it for Ctrl+Z.
+const undoStack = []
+const UNDO_LIMIT = 50
+
+function pushUndo(action, revert) {
+  undoStack.push({ action, revert })
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift()
+}
+
+async function undo() {
+  const op = undoStack.pop()
+  if (!op) return toast(t('undo.nothing'), 'info')
+  await op.revert()
+  toast(t('undo.done', { action: t(op.action) }), 'info')
+  refresh()
+}
+
+async function moveItems(paths, dir) {
+  const moved = (await call('move', paths, dir)) || []
+  if (moved.length) pushUndo('action.move', () => call('moveTo', moved.map(([from, to]) => [to, from])))
+  return moved
+}
+
+async function copyItems(paths, dir) {
+  const copied = (await call('copy', paths, dir)) || []
+  if (copied.length) pushUndo('action.copy', () => call('trash', copied.map(([, to]) => to)))
+  return copied
+}
+
+// pairs: [[path, newName]], all within their own folders
+async function renameItems(pairs) {
+  if (!(await call('renameMany', pairs))) return
+  pushUndo('action.rename', () => call('renameMany', pairs.map(([p, name]) => [joinPath(parentDir(p), name), baseName(p)])))
+}
+
+async function trashItems(paths) {
+  if (!(await call('trash', paths))) return
+  pushUndo('action.trash', () => call('restore', paths))
+}
+
+/* ========== clipboard (within the app) ========== */
+
+let clipboard = null // { paths, cut }
+
+function copySelection(cut) {
+  const paths = selectedInOrder()
+  if (!paths.length) return
+  clipboard = { paths, cut }
+  paintSelection()
+}
+
+async function paste() {
+  if (!clipboard) return
+  const dest = $('#content').dataset.path || state.cwd
+  if (clipboard.cut) {
+    await moveItems(clipboard.paths, dest)
+    clipboard = null
+  } else {
+    await copyItems(clipboard.paths, dest)
+  }
+  refresh()
+}
+
+async function duplicateSelection() {
+  const byFolder = new Map()
+  for (const p of selectedInOrder()) {
+    const dir = parentDir(p)
+    if (!byFolder.has(dir)) byFolder.set(dir, [])
+    byFolder.get(dir).push(p)
+  }
+  for (const [dir, paths] of byFolder) await copyItems(paths, dir)
+  refresh()
 }
 
 /*
@@ -817,7 +899,7 @@ function dropTarget(node, dir) {
  */
 const counter = (i, total) => String(i + 1).padStart(Math.max(2, String(total).length), '0')
 function renumber(paths, label) {
-  return call('renameMany', paths.map((p, i) => {
+  return renameItems(paths.map((p, i) => {
     const name = baseName(p)
     const dot = name.lastIndexOf('.')
     const ext = dot > 0 ? name.slice(dot) : ''
@@ -841,7 +923,7 @@ async function renameSelection() {
   if (paths.length === 1) {
     const name = await ask(t('rename.prompt'), baseName(paths[0]), true)
     if (name && name !== baseName(paths[0])) {
-      await call('renameMany', [[paths[0], name.trim()]])
+      await renameItems([[paths[0], name.trim()]])
       if (samePath(paths[0], state.focus)) setFocus(joinPath(parentDir(paths[0]), name.trim()))
     }
   } else if (paths.length > 1) {
@@ -857,7 +939,7 @@ async function renameSelection() {
 }
 
 async function trashSelection() {
-  await call('trash', selectedInOrder())
+  await trashItems(selectedInOrder())
   state.selection.clear()
   refresh()
 }
@@ -869,7 +951,10 @@ async function setMeta(paths, op) {
 
 async function newFolder() {
   const name = await ask(t('folder.newPrompt'), t('folder.newDefault'))
-  if (name) { await call('mkdir', state.cwd, name.trim()); refresh() }
+  if (!name) return
+  const created = await call('mkdir', state.cwd, name.trim())
+  if (created) pushUndo('action.newFolder', () => call('trash', [created]))
+  refresh()
 }
 
 const isPinned = p => pins.some(x => samePath(x.path, p))
@@ -915,6 +1000,10 @@ function itemMenu(e) {
     single && { label: t('menu.reveal'), run: () => call('reveal', single) },
     isFolder && { label: isPinned(single) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(single) },
     { label: single ? t('menu.rename') : t('menu.number', { n: paths.length }), key: 'F2', run: renameSelection },
+    '-',
+    { label: t('menu.copy'), key: 'Ctrl+C', run: () => copySelection(false) },
+    { label: t('menu.cut'), key: 'Ctrl+X', run: () => copySelection(true) },
+    { label: t('menu.duplicate'), key: 'Ctrl+D', run: duplicateSelection },
     ...activeExtensions().flatMap(x => x.menu ? ['-', ...x.menu(paths, metas)] : []),
     '-',
     { label: t('menu.trash'), key: t('key.delete'), danger: true, run: trashSelection },
@@ -1349,6 +1438,7 @@ function bindEvents() {
   const main = $('#main')
   main.addEventListener('click', clearSelection)
   main.addEventListener('contextmenu', e => showMenu(e, [
+    clipboard && { label: t('menu.paste'), key: 'Ctrl+V', run: paste },
     { label: t('menu.newFolder'), run: newFolder },
     { label: t('menu.openInExplorer'), run: () => call('open', state.cwd) },
     { label: isPinned(state.cwd) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(state.cwd) },
@@ -1360,7 +1450,7 @@ function bindEvents() {
     e.preventDefault()
     const paths = droppedPaths(e)
     const dir = contentPane.dataset.path
-    if (paths.length && dir) { await call('move', paths, dir); refresh() }
+    if (paths.length && dir) { await moveItems(paths, dir); refresh() }
   })
 
   // Without this, dropping a file outside a target would navigate the window to it.
@@ -1377,6 +1467,15 @@ function bindEvents() {
     }
     if (e.target.closest?.('input, select')) return
     if (viewerOpen()) return viewerKey(e)
+
+    const clipboardKey = e.ctrlKey && !e.shiftKey && !e.altKey && {
+      c: () => copySelection(false),
+      x: () => copySelection(true),
+      v: paste,
+      d: duplicateSelection,
+      z: undo,
+    }[e.key.toLowerCase()]
+    if (clipboardKey) { e.preventDefault(); return clipboardKey() }
     if (e.key === ' ') {
       e.preventDefault()
       return $('#content .item.sel:not(.folder)')?.preview()

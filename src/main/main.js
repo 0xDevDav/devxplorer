@@ -5,6 +5,7 @@ const fsp = fs.promises
 const path = require('path')
 const library = require('./library')
 const exif = require('./exif')
+const recycle = require('./recycle')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
@@ -67,6 +68,18 @@ let t = translator('en')
 let appearance = null
 let watcher = null
 let watchTimer = null
+
+// Rename when possible; across drives fall back to copy and delete.
+async function moveItem(from, to) {
+  try {
+    await fsp.rename(from, to)
+  } catch (e) {
+    if (e.code !== 'EXDEV') throw e
+    await fsp.cp(from, to, { recursive: true })
+    await fsp.rm(from, { recursive: true })
+  }
+  library.relocate(from, to)
+}
 
 const FOLDER_SIZE_TTL = 60000
 const folderSizes = new Map()
@@ -196,20 +209,39 @@ const handlers = {
   open: p => shell.openPath(p),
   reveal: p => shell.showItemInFolder(p),
 
+  // Returns [[from, to]] for every item actually moved, so the move can be undone.
   async move(paths, dest) {
+    const moved = []
     for (const p of paths) {
       if (lower(path.dirname(p)) === lower(dest) || isUnder(dest, p)) continue
       const to = await uniquePath(path.join(dest, path.basename(p)))
-      try {
-        await fsp.rename(p, to)
-      } catch (e) {
-        if (e.code !== 'EXDEV') throw e
-        await fsp.cp(p, to, { recursive: true })
-        await fsp.rm(p, { recursive: true })
-      }
-      library.relocate(p, to)
+      await moveItem(p, to)
+      moved.push([p, to])
+    }
+    return moved
+  },
+
+  // Moves each item to an exact path; used to undo moves. Never overwrites.
+  async moveTo(pairs) {
+    for (const [from, to] of pairs) {
+      if (fs.existsSync(to)) throw new Error(t('error.exists', { name: path.basename(to) }))
+      await moveItem(from, to)
     }
   },
+
+  // Copies next to the destination's existing items ("name (2)" on clashes); returns [[from, to]].
+  async copy(paths, dest) {
+    const copied = []
+    for (const p of paths) {
+      if (isUnder(dest, p) && lower(path.dirname(p)) !== lower(dest)) continue
+      const to = await uniquePath(path.join(dest, path.basename(p)))
+      await fsp.cp(p, to, { recursive: true, errorOnExist: true, force: false })
+      copied.push([p, to])
+    }
+    return copied
+  },
+
+  restore: paths => recycle.restore(paths),
 
   /*
    * pairs: [[path, newName]]. Renames go through temporary names first so that swaps and
@@ -237,16 +269,20 @@ const handlers = {
       await fsp.rename(tmp, targets[i])
       library.relocate(p, targets[i])
     }
+    return true
   },
 
   // Annotations are kept: a file restored from the Recycle Bin gets its status back.
   async trash(paths) {
     for (const p of paths) await shell.trashItem(p)
+    return true
   },
 
   async mkdir(dir, name) {
     checkName(name)
-    await fsp.mkdir(await uniquePath(path.join(dir, name)))
+    const target = await uniquePath(path.join(dir, name))
+    await fsp.mkdir(target)
+    return target
   },
 }
 
