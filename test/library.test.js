@@ -62,3 +62,15 @@ test('export shares file annotations only, import merges them', async () => {
   assert.equal((await metaOf(at('b', 'renamed.jpg'))).status, 'done')
   assert.equal(await metaOf(at('archive', 'carousel')), null)
 })
+
+test('pruning forgets locations of deleted files', async () => {
+  library.open(at('prune.db'))
+  write(at('p', 'gone.txt'), 'bye')
+  write(at('p', 'kept.txt'), 'hi')
+  for (const name of ['gone.txt', 'kept.txt']) await library.annotate(at('p', name), fs.statSync(at('p', name)), { status: 'todo' })
+  fs.rmSync(at('p', 'gone.txt'))
+  await library.prune()
+  const known = library.knownLocations()
+  assert.ok(known.includes(at('p', 'kept.txt')))
+  assert.ok(!known.includes(at('p', 'gone.txt')))
+})

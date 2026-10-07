@@ -116,12 +116,23 @@ const ops = fileOps({ t: (...args) => t(...args), relocate: (from, to) => librar
 
 const libraryFilter = () => [{ name: t('library.fileType'), extensions: ['db'] }]
 
+// Drive letters in use, probed in parallel. A drive that is slow to answer (a mapped network share
+// waking up) is listed rather than waited for.
+const DRIVE_PROBE_MS = 800
+async function connectedDrives() {
+  const probe = d => Promise.race([
+    fsp.access(d).then(() => d, () => null),
+    new Promise(resolve => setTimeout(() => resolve(d), DRIVE_PROBE_MS)),
+  ])
+  return (await Promise.all([...'CDEFGHIJKLMNOPQRSTUVWXYZ'].map(c => probe(c + ':\\')))).filter(Boolean)
+}
+
 const handlers = {
-  init: () => ({
+  init: async () => ({
     supportsGlass: SUPPORTS_MICA,
     start: folderArgument(process.argv),
     places: ['desktop', 'pictures', 'videos', 'documents', 'downloads'].map(kind => ({ path: app.getPath(kind), kind })),
-    drives: [...'CDEFGHIJKLMNOPQRSTUVWXYZ'].map(c => c + ':\\').filter(d => fs.existsSync(d)),
+    drives: await connectedDrives(),
   }),
 
   // Watches only the current folder: a recursive watch on a whole drive is too expensive.
@@ -456,6 +467,7 @@ app.whenReady().then(() => {
     writeJson(WINDOW_FILE, { bounds: win.getNormalBounds(), maximized: win.isMaximized(), chrome, appearance })
   })
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
+  win.webContents.once('did-finish-load', () => library.prune().catch(() => {}))
 })
 
 app.on('window-all-closed', () => {

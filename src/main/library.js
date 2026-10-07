@@ -83,11 +83,24 @@ function open(file) {
     clearField: db.prepare('DELETE FROM annotations WHERE key = ? AND field = ?'),
     rekey: db.prepare('UPDATE OR REPLACE annotations SET key = ? WHERE key = ?'),
   }
-  transaction(() => {
-    for (const row of q.allLocations.all()) if (!fs.existsSync(row.path)) q.dropLocation.run(row.path)
-  })
   loadSizes()
 }
+
+/*
+ * Forgets locations whose file is gone. Runs in the background after startup: paths on network
+ * shares can take seconds to answer. Locations on a drive that is not connected (a USB disk, an
+ * offline share) are kept, so their annotations come back when the drive does.
+ */
+async function prune() {
+  const rows = q.allLocations.all()
+  const gone = await Promise.all(rows.map(async ({ path: p }) => {
+    if (!(await exists(path.parse(p).root))) return null
+    return (await exists(p)) ? null : p
+  }))
+  transaction(() => { for (const p of gone) if (p) q.dropLocation.run(p) })
+}
+
+const exists = p => fsp.access(p).then(() => true, () => false)
 
 function loadSizes() {
   annotatedSizes = new Set(q.fileKeys.all().map(r => Number(r.key.split(':')[1])))
@@ -214,4 +227,4 @@ function importFrom(file) {
   }
 }
 
-module.exports = { open, close, metaFor, annotate, relocate, knownLocations, allMeta, exportTo, importFrom }
+module.exports = { open, prune, close, metaFor, annotate, relocate, knownLocations, allMeta, exportTo, importFrom }
