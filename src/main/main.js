@@ -4,6 +4,7 @@ const os = require('os')
 const fsp = fs.promises
 const path = require('path')
 const library = require('./library')
+const exif = require('./exif')
 const { pickLanguage, translator } = require('../shared/messages')
 
 const DATA_DIR = app.getPath('userData')
@@ -119,6 +120,14 @@ const handlers = {
     folderSizes.set(key, { at: Date.now(), size })
     return size
   },
+
+  async photoInfo(p) {
+    const stat = await fsp.stat(p).catch(() => null)
+    return stat && exif.photoInfo(p, stat.mtimeMs)
+  },
+
+  // items: [[path, mtime]] -> capture time of each photo, or null when it has none.
+  photoDates: items => Promise.all(items.map(([p, mtime]) => exif.photoInfo(p, mtime).then(info => info?.taken ?? null))),
 
   async diskSpace(p) {
     const s = await fsp.statfs(path.parse(p).root).catch(() => null)

@@ -141,7 +141,23 @@ async function list(dir) {
   const data = (await call('list', dir)) || { folders: [], files: [] }
   remember(data.folders)
   remember(data.files)
+  if (needsPhotoDates()) await attachPhotoDates(data.files)
   return data
+}
+
+/*
+ * Photos are dated by their EXIF capture time when they have one, every other file by its
+ * modification time. Capture dates are read only while sorting or grouping by date.
+ */
+const PHOTO_FILE = /\.(jpe?g|heic|heif)$/i
+const fileDate = item => item.taken ?? item.mtime
+const needsPhotoDates = () => state.sort === 'date' || state.group === 'day' || state.group === 'month'
+
+async function attachPhotoDates(files) {
+  const photos = files.filter(f => f.taken === undefined && PHOTO_FILE.test(f.name))
+  if (!photos.length) return
+  const dates = (await call('photoDates', photos.map(f => [f.path, f.mtime]))) || []
+  photos.forEach((f, i) => { f.taken = dates[i] ?? null })
 }
 
 function toast(message) {
@@ -152,7 +168,7 @@ function toast(message) {
   toast.timer = setTimeout(() => { box.hidden = true }, 4000)
 }
 
-const sorted = items => items.sort(state.sort === 'date' ? (a, b) => b.mtime - a.mtime : byName)
+const sorted = items => items.sort(state.sort === 'date' ? (a, b) => fileDate(b) - fileDate(a) : byName)
 const nameMatches = item => !state.query || item.name.toLowerCase().includes(state.query)
 
 /* ========== extensions ========== */
@@ -415,6 +431,7 @@ async function render() {
   state.allMeta = (await call('allMeta')) || []
   if (filtering()) {
     const all = remember((await call('annotated')) || []).filter(i => metaMatches(i.meta))
+    if (needsPhotoDates()) await attachPhotoDates(all.filter(i => !i.isDir))
     if (id !== renderId) return
     const folders = all.filter(i => i.isDir && nameMatches(i))
     const files = all.filter(i => !i.isDir && nameMatches(i))
@@ -542,11 +559,11 @@ const FILE_KINDS = [
   ['kind.other', () => true],
 ]
 
-// Dates use the modification time, the same one behind the "most recent" sort.
+// Date groups use the same date as the "most recent" sort (capture time for photos).
 const GROUPINGS = {
-  day: { key: f => startOfDay(f.mtime), label: dayLabel, compare: (a, b) => b - a },
+  day: { key: f => startOfDay(fileDate(f)), label: dayLabel, compare: (a, b) => b - a },
   month: {
-    key: f => { const d = new Date(f.mtime); return new Date(d.getFullYear(), d.getMonth()).getTime() },
+    key: f => { const d = new Date(fileDate(f)); return new Date(d.getFullYear(), d.getMonth()).getTime() },
     label: month => capitalize(monthFormat.format(month)),
     compare: (a, b) => b - a,
   },
@@ -971,13 +988,152 @@ function showViewer() {
   }
 
   const transparent = TRANSPARENT_IMAGE.test(file.name)
-  const hints = [t('viewer.hint.browse'), ...(transparent ? [t('viewer.hint.matte')] : []), ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean), t('viewer.hint.open'), t('viewer.hint.close')]
+  const zoomable = file.type === 'img' || /\.svg$/i.test(file.name)
+  const hints = [
+    t('viewer.hint.browse'),
+    ...(zoomable ? [t('viewer.hint.zoom')] : []),
+    ...(transparent ? [t('viewer.hint.matte')] : []),
+    t('viewer.hint.info'),
+    ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean),
+    t('viewer.hint.open'),
+    t('viewer.hint.close'),
+  ]
   const bar = el('div', 'viewer-bar')
   bar.append(el('span', '', `${viewer.index + 1} / ${viewer.items.length} · ${file.name}`), badges(file.path), el('span', 'hint', hints.join(' · ')))
   box.replaceChildren(media, bar)
   if (transparent) box.append(matteSwitch())
+  if (infoOpen()) box.append(infoPanel(file, media))
   applyMatte()
+  resetZoom()
   box.classList.add('show')
+}
+
+/*
+ * Zoom and pan for images: the wheel zooms around the pointer, dragging pans, double click
+ * switches between fit and actual pixels, + and - work from the keyboard.
+ */
+const ZOOM_MAX = 8
+let zoom = { scale: 1, x: 0, y: 0 }
+const viewerImage = () => $('#viewer > img')
+
+function applyZoom() {
+  const img = viewerImage()
+  if (!img) return
+  img.style.transform = zoom.scale === 1 ? '' : `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`
+  img.classList.toggle('zoomed', zoom.scale > 1)
+}
+
+function resetZoom() {
+  zoom = { scale: 1, x: 0, y: 0 }
+  applyZoom()
+}
+
+// Scales around the given point, so whatever is under the pointer stays under it.
+function zoomBy(factor, clientX, clientY) {
+  const img = viewerImage()
+  if (!img) return
+  const next = Math.min(ZOOM_MAX, Math.max(1, zoom.scale * factor))
+  if (next === 1) return resetZoom()
+  const r = img.getBoundingClientRect()
+  const dx = (clientX ?? r.left + r.width / 2) - (r.left + r.width / 2)
+  const dy = (clientY ?? r.top + r.height / 2) - (r.top + r.height / 2)
+  const k = next / zoom.scale
+  zoom = { scale: next, x: zoom.x - dx * (k - 1), y: zoom.y - dy * (k - 1) }
+  applyZoom()
+}
+
+// Fit <-> actual pixels; images that already fit at their real size zoom to 2x instead.
+function toggleActualSize(e) {
+  const img = viewerImage()
+  if (zoom.scale > 1) return resetZoom()
+  const actual = img.naturalWidth / img.getBoundingClientRect().width
+  zoomBy(actual > 1.05 ? actual : 2, e.clientX, e.clientY)
+}
+
+function bindViewerZoom() {
+  const box = $('#viewer')
+  box.addEventListener('wheel', e => {
+    if (!viewerImage()) return
+    e.preventDefault()
+    zoomBy(Math.exp(-e.deltaY * 0.002), e.clientX, e.clientY)
+  }, { passive: false })
+  box.addEventListener('dblclick', e => { if (e.target === viewerImage()) toggleActualSize(e) })
+  box.addEventListener('pointerdown', e => {
+    const img = viewerImage()
+    if (e.target !== img || zoom.scale === 1) return
+    e.preventDefault()
+    const start = { x: e.clientX - zoom.x, y: e.clientY - zoom.y }
+    img.classList.add('dragging')
+    const move = ev => { zoom.x = ev.clientX - start.x; zoom.y = ev.clientY - start.y; applyZoom() }
+    const up = () => {
+      img.classList.remove('dragging')
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  })
+}
+
+/* Info panel (I): size and dates, plus dimensions, duration and camera details where available. */
+const infoOpen = () => localStorage.infoPanel === 'true'
+const dateTimeFormat = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
+const waitFor = (node, event) => new Promise(resolve => node.addEventListener(event, resolve, { once: true }))
+
+function formatDuration(seconds) {
+  const s = Math.round(seconds)
+  const hms = [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60]
+  return (hms[0] ? hms : hms.slice(1)).map((n, i) => i ? String(n).padStart(2, '0') : n).join(':')
+}
+
+function exposureLabel(info) {
+  return [
+    info.exposure && (info.exposure < 1 ? `1/${Math.round(1 / info.exposure)} s` : `${sizeFormat.format(info.exposure)} s`),
+    info.fNumber && 'f/' + sizeFormat.format(info.fNumber),
+    info.iso && 'ISO ' + info.iso,
+    info.focalLength && sizeFormat.format(info.focalLength) + ' mm',
+  ].filter(Boolean).join(' · ')
+}
+
+function infoPanel(file, media) {
+  const panel = el('aside', 'info-panel')
+  const list = el('dl')
+  panel.append(el('h4', '', file.name), list)
+  const row = (key, value) => { if (value) list.append(el('dt', '', t(key)), el('dd', '', value)) }
+
+  ;(async () => {
+    const item = state.items.get(file.path) || file
+    const photo = file.type === 'img' ? (await call('photoInfo', file.path)) || {} : {}
+    let { width, height } = photo
+    let duration = null
+    if (media.tagName === 'VIDEO') {
+      if (media.readyState < 1) await waitFor(media, 'loadedmetadata')
+      width = media.videoWidth
+      height = media.videoHeight
+      duration = media.duration
+    } else if (media.tagName === 'IMG' && !width) {
+      if (!media.complete) await waitFor(media, 'load')
+      width = media.naturalWidth
+      height = media.naturalHeight
+    }
+    const camera = photo.model && (photo.make && !photo.model.startsWith(photo.make) ? `${photo.make} ${photo.model}` : photo.model)
+    row('info.dimensions', width && `${width} × ${height} px`)
+    row('info.duration', duration && formatDuration(duration))
+    row('info.size', item.size != null && !item.isDir && formatBytes(item.size))
+    row('info.taken', photo.taken && dateTimeFormat.format(photo.taken))
+    row('info.modified', item.mtime && dateTimeFormat.format(item.mtime))
+    row('info.camera', camera)
+    row('info.lens', photo.lens)
+    row('info.exposure', exposureLabel(photo))
+  })()
+  return panel
+}
+
+function toggleInfo() {
+  localStorage.infoPanel = !infoOpen()
+  const box = $('#viewer')
+  box.querySelector('.info-panel')?.remove()
+  if (infoOpen()) box.append(infoPanel(viewer.items[viewer.index], box.firstElementChild))
 }
 
 /* Images that may contain transparency can be shown on a dark, light or checkerboard matte. */
@@ -1020,6 +1176,9 @@ function viewerKey(e) {
     closeViewer()
   }
   else if (e.key === 'Enter') call('open', file.path)
+  else if (e.key === '+' || e.key === '=') zoomBy(1.25)
+  else if (e.key === '-') zoomBy(0.8)
+  else if (e.key.toLowerCase() === 'i') toggleInfo()
   else if (e.key.toLowerCase() === 'b' && TRANSPARENT_IMAGE.test(file.name)) {
     const i = MATTES.findIndex(([m]) => m === currentMatte())
     setMatte(MATTES[(i + 1) % MATTES.length][0])
@@ -1214,7 +1373,7 @@ function bindEvents() {
     if ($('dialog[open]')) return
     if (e.ctrlKey && !viewerOpen()) {
       const step = { '+': 1, '=': 1, '-': -1, '0': 0 }[e.key]
-      if (step !== undefined) { e.preventDefault(); return zoom(pointerSection, step) }
+      if (step !== undefined) { e.preventDefault(); return resizeSection(pointerSection, step) }
     }
     if (e.target.closest?.('input, select')) return
     if (viewerOpen()) return viewerKey(e)
@@ -1269,10 +1428,11 @@ function bindEvents() {
   }
   // Ctrl + wheel resizes the section under the pointer instead of zooming the whole window.
   document.addEventListener('pointerover', e => { pointerSection = sectionOf(e.target) })
+  bindViewerZoom()
   document.addEventListener('wheel', e => {
-    if (!e.ctrlKey) return
+    if (!e.ctrlKey || viewerOpen()) return
     e.preventDefault()
-    zoom(sectionOf(e.target), e.deltaY < 0 ? 1 : -1)
+    resizeSection(sectionOf(e.target), e.deltaY < 0 ? 1 : -1)
   }, { passive: false })
 
   systemDark.addEventListener('change', applyTheme)
@@ -1299,7 +1459,7 @@ function applySizes() {
   for (const z of Object.values(ZOOM)) document.body.style.setProperty(z.cssVar, zoomValue(z) + 'px')
 }
 
-function zoom(section, step) {
+function resizeSection(section, step) {
   const z = ZOOM[section]
   const index = z.steps.findIndex(s => s >= zoomValue(z))
   const from = index < 0 ? z.steps.length - 1 : index
