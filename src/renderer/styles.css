@@ -397,6 +397,8 @@ body.inactive .frow.sel { color: var(--text); background: var(--line-strong) }
 .item.sel .name { color: var(--on-accent); background: var(--accent) }
 body.inactive .item.sel .name { color: var(--text); background: var(--line-strong) }
 .item.dim .thumb { opacity: .4 }
+/* hidden files, when shown, are faded as in the Finder */
+.hidden-item .thumb, .hidden-item .name, .frow.hidden-item .collage, .frow.hidden-item .fname { opacity: .55 }
 .item.cut, .frow.cut { opacity: .45 }
 .item.folder .collage { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0 }
 .item.folder .name { font-weight: 600; color: var(--text) }

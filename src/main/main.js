@@ -176,11 +176,16 @@ const handlers = {
   },
 
   // denied: the folder exists but Windows refuses to list it (system folders, other users' files).
-  async list(dir) {
+  // showHidden lists dot files and system entries too, flagged as hidden.
+  async list(dir, showHidden = false) {
     let denied = false
     const names = await fsp.readdir(dir).catch(e => { denied = e.code === 'EPERM' || e.code === 'EACCES'; return [] })
     names.filter(n => STRAY_NUL.test(n)).forEach(n => removeStrayNul(path.join(dir, n)))
-    const items = (await Promise.all(names.filter(n => !HIDDEN.test(n)).map(n => describe(path.join(dir, n))))).filter(Boolean)
+    const shown = names.filter(n => !STRAY_NUL.test(n) && (showHidden || !HIDDEN.test(n)))
+    const items = (await Promise.all(shown.map(async n => {
+      const item = await describe(path.join(dir, n))
+      return item && HIDDEN.test(n) ? { ...item, hidden: true } : item
+    }))).filter(Boolean)
     return { folders: items.filter(i => i.isDir), files: items.filter(i => !i.isDir), denied }
   },
 

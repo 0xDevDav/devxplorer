@@ -123,6 +123,7 @@ const state = {
   anchor: null,
   sort: localStorage.sort || 'name',
   reverse: localStorage.reverse === 'true',
+  showHidden: localStorage.showHidden === 'true',
   group: localStorage.group || 'none',
   query: '',
 }
@@ -158,7 +159,7 @@ function remember(items) {
 }
 
 async function list(dir) {
-  const data = (await call('list', dir)) || { folders: [], files: [] }
+  const data = (await call('list', dir, state.showHidden)) || { folders: [], files: [] }
   remember(data.folders)
   remember(data.files)
   if (needsPhotoDates()) await attachPhotoDates(data.files)
@@ -426,6 +427,7 @@ const SHORTCUTS = [
   ['keys.group.view', [
     ['Ctrl++|Ctrl+-|Ctrl+key.wheel', 'keys.zoom'],
     ['Ctrl+0', 'keys.zoomReset'],
+    ['Ctrl+Shift+.', 'menu.showHidden'],
   ]],
   ['keys.group.viewer', [
     ['←|→', 'keys.browse'],
@@ -555,7 +557,7 @@ const folderListings = new Map()
 
 function folderListing(folder) {
   if (folder.mtime == null) return list(folder.path)
-  const key = `${folder.path}|${folder.mtime}|${needsPhotoDates()}`
+  const key = `${folder.path}|${folder.mtime}|${needsPhotoDates()}|${state.showHidden}`
   if (!folderListings.has(key)) {
     if (folderListings.size >= FOLDER_CACHE_LIMIT) folderListings.delete(folderListings.keys().next().value)
     folderListings.set(key, list(folder.path))
@@ -653,7 +655,7 @@ async function render() {
 }
 
 function folderRow(entry) {
-  const row = el('div', 'frow' + (samePath(entry.path, state.focus) ? ' focus' : '') + (!entry.self && dimmed(entry.path) ? ' dim' : ''))
+  const row = el('div', 'frow' + (samePath(entry.path, state.focus) ? ' focus' : '') + (!entry.self && dimmed(entry.path) ? ' dim' : '') + (entry.hidden ? ' hidden-item' : ''))
   row.entry = entry
   const collage = el('div', 'collage')
   const count = el('div', 'fcount')
@@ -848,7 +850,7 @@ function enterFocus() {
 }
 
 function folderTile(folder) {
-  const tile = el('div', 'item folder' + (dimmed(folder.path) ? ' dim' : ''))
+  const tile = el('div', 'item folder' + (dimmed(folder.path) ? ' dim' : '') + (folder.hidden ? ' hidden-item' : ''))
   const thumb = el('div', 'thumb')
   const collage = el('div', 'collage')
   const count = el('div', 'fcount')
@@ -919,7 +921,7 @@ function displayName(name) {
 }
 
 function fileCard(file, siblings) {
-  const card = el('div', 'item' + (dimmed(file.path) ? ' dim' : ''))
+  const card = el('div', 'item' + (dimmed(file.path) ? ' dim' : '') + (file.hidden ? ' hidden-item' : ''))
   const thumb = el('div', 'thumb')
   thumb.append(previewImg(file), badges(file.path))
   if (file.type === 'video') thumb.append(icon('play', 'play'))
@@ -2065,6 +2067,12 @@ function setSort(value) {
   refresh()
 }
 
+function toggleHidden() {
+  state.showHidden = !state.showHidden
+  localStorage.showHidden = state.showHidden
+  refresh()
+}
+
 function setGroup(value) {
   state.group = localStorage.group = value
   renderControls()
@@ -2108,6 +2116,8 @@ function bindEvents() {
     { label: t('menu.openInExplorer'), run: () => call('open', state.cwd) },
     { label: t('menu.copyPath'), run: () => copyPaths([state.cwd]) },
     { label: isPinned(state.cwd) ? t('menu.unpin') : t('menu.pin'), run: () => togglePin(state.cwd) },
+    '-',
+    { label: t('menu.showHidden'), key: 'Ctrl+Shift+.', check: state.showHidden, run: toggleHidden },
   ]))
 
   const contentPane = $('#content')
@@ -2147,6 +2157,8 @@ function bindEvents() {
       z: undo,
     }[e.key.toLowerCase()]
     if (clipboardKey) { e.preventDefault(); return clipboardKey() }
+    // By key position, so it works on layouts where Shift+. types another character.
+    if (e.ctrlKey && e.shiftKey && e.code === 'Period') { e.preventDefault(); return toggleHidden() }
     if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); return goHistory(e.key === 'ArrowLeft' ? -1 : 1) }
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c') { e.preventDefault(); return copyPaths(selectedInOrder()) }
     if (e.key === ' ') {
