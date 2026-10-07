@@ -420,8 +420,13 @@ const handlers = {
   },
 
   async setShellIntegration(enabled) {
-    if (enabled) await shellIntegration.enable(t('shell.openIn'), launchCommand())
-    else await shellIntegration.disable()
+    if (enabled) {
+      await shellIntegration.enable(t('shell.openIn'), launchCommand())
+      installModernMenu()
+    } else {
+      await shellIntegration.disable()
+      shellIntegration.removeModernMenu()
+    }
     return shellIntegration.isEnabled()
   },
 
@@ -571,6 +576,11 @@ function folderArgument(argv) {
     fs.existsSync(a) && fs.statSync(a).isDirectory())
 }
 
+// The Windows 11 menu package: shipped with the installed app, built into assets/shellext in a checkout.
+const MODERN_MENU = app.isPackaged ? path.join(process.resourcesPath, 'shellext') : path.join(__dirname, '..', '..', 'assets', 'shellext')
+const installModernMenu = () => shellIntegration.installModernMenu(MODERN_MENU, path.join(DATA_DIR, 'shellext'), app.getVersion())
+  .catch(error => log.error('context menu package:', error))
+
 // How Windows should start the app: the packaged executable, or Electron with the project path.
 const launchCommand = () => app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]
 
@@ -664,6 +674,8 @@ app.whenReady().then(() => {
   nativeTheme.themeSource = appearance.theme
   createWindow().webContents.once('did-finish-load', () => library.prune().catch(() => {}))
   updates.start()
+  // An update brings a new menu package: register it if the integration is on.
+  shellIntegration.isEnabled().then(on => on && installModernMenu())
 })
 
 app.on('window-all-closed', () => {

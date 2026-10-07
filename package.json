@@ -54,6 +54,12 @@
         "owner": "0xDevDav",
         "repo": "devxplorer"
       }
+    ],
+    "extraResources": [
+      {
+        "from": "assets/shellext",
+        "to": "shellext"
+      }
     ]
   },
   "devDependencies": {

@@ -9,6 +9,9 @@
  * Recycle Bin, Open and Save dialogs) stays with Windows.
  */
 const { execFile } = require('child_process')
+const fs = require('fs')
+const path = require('path')
+const { powershell } = require('./powershell')
 
 const KEYS = [
   ['HKCU\\Software\\Classes\\Directory\\shell\\DevXplorer', '%1'],
@@ -71,4 +74,49 @@ async function unsetDefault() {
   await reg(['delete', WIN_E, '/f']).catch(() => {})
 }
 
-module.exports = { isEnabled, enable, disable, isDefault, setDefault, unsetDefault }
+/*
+ * The Windows 11 context menu shows only entries that come from a package. DevXplorer's package
+ * (native/shellext) is not signed, so Windows accepts it only with Developer Mode on; elsewhere
+ * the entry stays under "Show more options". The package is copied to a folder named after the
+ * app version before registering: File Explorer keeps the DLL loaded, and an update must never
+ * have to replace a file in use. The entry follows the classic verb, so it hides itself when the
+ * integration is turned off.
+ */
+const PACKAGE = '0xDevDav.DevXplorer.ContextMenu'
+
+async function developerMode() {
+  try {
+    const out = await reg(['query', 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock', '/v', 'AllowDevelopmentWithoutDevLicense'])
+    return /0x1\b/.test(out)
+  } catch {
+    return false
+  }
+}
+
+const packageVersion = version => version.split('.').concat('0', '0', '0', '0').slice(0, 4).join('.')
+
+// source: the built package (assets/shellext); store: where versioned copies are kept.
+async function installModernMenu(source, store, version) {
+  if (!(await developerMode())) return false
+  const wanted = packageVersion(version)
+  const installed = (await powershell(`(Get-AppxPackage -Name '${PACKAGE}').Version`).catch(() => '')).trim()
+  if (installed === wanted) return true
+  const target = path.join(store, wanted)
+  if (!fs.existsSync(path.join(target, 'AppxManifest.xml'))) {
+    fs.cpSync(source, target, { recursive: true })
+    const manifest = path.join(target, 'AppxManifest.xml')
+    fs.writeFileSync(manifest, fs.readFileSync(manifest, 'utf8').replace('Version="{VERSION}"', `Version="${wanted}"`))
+  }
+  await powershell('Add-AppxPackage -Register $env:DX_MANIFEST -ForceUpdateFromAnyVersion', { MANIFEST: path.join(target, 'AppxManifest.xml') })
+  // Copies of earlier versions go once File Explorer has let go of their DLL.
+  for (const name of fs.readdirSync(store)) {
+    if (name !== wanted) try { fs.rmSync(path.join(store, name), { recursive: true, force: true }) } catch {}
+  }
+  return true
+}
+
+async function removeModernMenu() {
+  await powershell(`Get-AppxPackage -Name '${PACKAGE}' | Remove-AppxPackage`).catch(() => {})
+}
+
+module.exports = { isEnabled, enable, disable, isDefault, setDefault, unsetDefault, developerMode, installModernMenu, removeModernMenu }

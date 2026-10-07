@@ -1,6 +1,7 @@
 ; Removes the "Open in DevXplorer" entries the app may have added to the File Explorer menu when
 ; it is uninstalled, and gives folders and Win+E back to File Explorer if DevXplorer was the
-; default. An update also runs the old uninstaller, so everything is kept in that case.
+; default, and removes the Windows 11 menu package. An update also runs the old uninstaller, so
+; everything is kept in that case.
 !macro customUnInstall
   ${ifNot} ${isUpdated}
     ReadRegStr $0 HKCU "Software\Classes\Directory\shell" ""
@@ -12,5 +13,6 @@
     DeleteRegKey HKCU "Software\Classes\Directory\shell\DevXplorer"
     DeleteRegKey HKCU "Software\Classes\Directory\Background\shell\DevXplorer"
     DeleteRegKey HKCU "Software\Classes\Drive\shell\DevXplorer"
+    nsExec::Exec 'powershell.exe -NoProfile -NonInteractive -Command "Get-AppxPackage -Name 0xDevDav.DevXplorer.ContextMenu | Remove-AppxPackage"'
   ${endIf}
 !macroend

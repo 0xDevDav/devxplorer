@@ -2596,7 +2596,8 @@ function bindEvents() {
 
   systemDark.addEventListener('change', applyTheme)
   api.onChanged(refresh)
-  api.onOpenFolder(dir => newTab(dir))
+  // A folder opened from Windows (double click, Win+E, the menu) replaces the current one; Back returns.
+  api.onOpenFolder(dir => navigate(dir))
   api.onCloseViewer(closeViewer)
   api.onProgress(showProgress)
   api.onUpdate(renderUpdate)
@@ -2778,11 +2779,11 @@ function openSetup(step = 0) {
     page.append(Object.assign(el('img', 'setup-icon'), { src: '../../assets/icon.png', alt: '' }))
     heading('setup.welcome.title', 'setup.welcome.text')
     const choices = el('div', 'segmented')
-    for (const [code, label] of LANGUAGES) {
-      const b = el('button', language === code ? 'on' : '', label)
+    for (const [code, label] of [['system', t('settings.system')], ...LANGUAGES]) {
+      const b = el('button', languagePreference() === code ? 'on' : '', label)
       b.type = 'button'
       b.onclick = () => {
-        if (code === language) return
+        if (code === languagePreference()) return
         localStorage.language = code
         location.reload()
       }

@@ -1,0 +1,4 @@
+LIBRARY DevXplorerShellExt
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE

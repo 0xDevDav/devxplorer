@@ -1,8 +1,9 @@
 /*
  * Renders assets/icon.svg to assets/icon.png (1024x1024), the source electron-builder turns
- * into the Windows .ico. Run with: npm run icon
+ * into the Windows .ico, and the logos the Windows 11 context menu package needs.
+ * Run with: npm run icon
  */
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, nativeImage } = require('electron')
 const fs = require('fs')
 const path = require('path')
 
@@ -22,6 +23,12 @@ app.whenReady().then(async () => {
     }
     img.src = 'data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}'
   })`)
-  fs.writeFileSync(path.join(__dirname, '..', 'assets', 'icon.png'), Buffer.from(dataUrl.split(',')[1], 'base64'))
+  const png = Buffer.from(dataUrl.split(',')[1], 'base64')
+  fs.writeFileSync(path.join(__dirname, '..', 'assets', 'icon.png'), png)
+  const logos = path.join(__dirname, '..', 'assets', 'shellext', 'Assets')
+  fs.mkdirSync(logos, { recursive: true })
+  for (const [name, size] of [['StoreLogo', 50], ['Square44x44Logo', 44], ['Square150x150Logo', 150]]) {
+    fs.writeFileSync(path.join(logos, name + '.png'), nativeImage.createFromBuffer(png).resize({ width: size, height: size, quality: 'best' }).toPNG())
+  }
   app.quit()
 })
