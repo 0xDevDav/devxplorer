@@ -102,6 +102,11 @@
 * { box-sizing: border-box }
 [hidden] { display: none !important }
 
+/* keyboard focus: an accent ring like macOS, never shown for mouse clicks */
+:focus { outline: none }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: 2px; border-radius: 6px }
+input:focus-visible, .path-input:focus-visible { outline: none }
+
 body {
   margin: 0;
   height: 100vh;
