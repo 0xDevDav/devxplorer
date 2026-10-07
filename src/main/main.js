@@ -420,12 +420,14 @@ const handlers = {
   defaultFileManager: () => shellIntegration.isDefault(),
 
   async setDefaultFileManager(enabled) {
+    if (!ownsIntegration()) return shellIntegration.isDefault()
     if (enabled) await shellIntegration.setDefault(t('shell.openIn'), launchCommand())
     else await shellIntegration.unsetDefault()
     return shellIntegration.isDefault()
   },
 
   async setShellIntegration(enabled) {
+    if (!ownsIntegration()) return shellIntegration.isEnabled()
     if (enabled) {
       await shellIntegration.enable(t('shell.openIn'), launchCommand())
       installModernMenu()
@@ -440,8 +442,9 @@ const handlers = {
     if (language && language !== currentLanguage) {
       currentLanguage = language
       t = translator(language)
-      // keep the File Explorer entry in the app language
-      shellIntegration.isDefault().then(async isDefault => {
+      // Keeps the File Explorer entry in the app language. Only the installed app rewrites it: the
+      // entry points at whichever app writes it, and a development run must not take it over.
+      if (ownsIntegration()) shellIntegration.isDefault().then(async isDefault => {
         if (isDefault) await shellIntegration.setDefault(t('shell.openIn'), launchCommand())
         else if (await shellIntegration.isEnabled()) await shellIntegration.enable(t('shell.openIn'), launchCommand())
       }).catch(error => log.error('shell integration:', error))
@@ -591,7 +594,7 @@ const MODERN_MENU = app.isPackaged ? path.join(process.resourcesPath, 'shellext'
 // leaves it behind.
 let modernMenuQueue = Promise.resolve()
 // Only the installed app manages it: a development run would replace the installed app's package.
-const queueModernMenu = work => app.isPackaged && !FROM_STORE
+const queueModernMenu = work => ownsIntegration()
   ? (modernMenuQueue = modernMenuQueue.then(work).catch(error => log.error('context menu package:', error)))
   : modernMenuQueue
 const installModernMenu = () => queueModernMenu(() => shellIntegration.installModernMenu(MODERN_MENU, path.join(DATA_DIR, 'shellext'), app.getVersion()))
@@ -599,6 +602,10 @@ const removeModernMenu = () => queueModernMenu(() => shellIntegration.removeMode
 
 // The project's home, shown in the About section and the listing.
 const PROJECT_URL = require('../../package.json').homepage
+
+// The File Explorer entries point at the app that writes them, so only the installed app does: a
+// development run would take them over from the installed one.
+const ownsIntegration = () => app.isPackaged && !FROM_STORE
 
 // How Windows should start the app: the packaged executable, or Electron with the project path.
 const launchCommand = () => app.isPackaged ? [process.execPath] : [process.execPath, app.getAppPath()]
