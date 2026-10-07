@@ -97,6 +97,7 @@ const state = {
   cwd: null,
   focus: null, // folder whose content is shown in the right pane
   meta: {}, // path -> annotations, filled from every listing
+  items: new Map(), // path -> listing entry (size, type), for the status bar
   allMeta: [], // annotations of the whole library, for extension filter chips
   places: [],
   drives: [],
@@ -129,7 +130,10 @@ async function call(name, ...args) {
 }
 
 function remember(items) {
-  for (const item of items) state.meta[item.path] = item.meta
+  for (const item of items) {
+    state.meta[item.path] = item.meta
+    state.items.set(item.path, item)
+  }
   return items
 }
 
@@ -449,6 +453,7 @@ async function render() {
   renderTabs()
   renderExtensionFilters()
   paintSelection()
+  renderDiskSpace()
 }
 
 function folderRow(entry) {
@@ -737,6 +742,40 @@ function clearSelection() {
 
 function paintSelection() {
   $$('#main [data-path]').forEach(n => n.classList.toggle('sel', state.selection.has(n.dataset.path)))
+  renderStatus()
+}
+
+/* ========== status bar ========== */
+
+const sizeFormat = new Intl.NumberFormat(language, { maximumFractionDigits: 1 })
+function formatBytes(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0
+  while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++ }
+  return sizeFormat.format(bytes) + ' ' + units[i]
+}
+
+// Folder sizes arrive asynchronously; a newer call makes older ones drop their result.
+let statusToken = 0
+async function renderStatus() {
+  const token = ++statusToken
+  const left = $('#statusLeft')
+  const parts = [t.n('count.items', $$('#content [data-path]').filter(isShown).length)]
+  const selected = selectedInOrder().map(p => state.items.get(p)).filter(Boolean)
+  if (!selected.length) { left.textContent = parts.join(' · '); return }
+
+  parts.push(t.n('status.selected', selected.length))
+  const files = selected.filter(i => !i.isDir).reduce((sum, i) => sum + i.size, 0)
+  const folders = selected.filter(i => i.isDir)
+  left.textContent = [...parts, folders.length ? t('status.computing') : formatBytes(files)].join(' · ')
+  if (!folders.length) return
+  const sizes = await Promise.all(folders.map(f => call('folderSize', f.path)))
+  if (token === statusToken) left.textContent = [...parts, formatBytes(files + sizes.reduce((a, b) => a + (b || 0), 0))].join(' · ')
+}
+
+async function renderDiskSpace() {
+  const space = await call('diskSpace', state.cwd)
+  $('#statusRight').textContent = space ? t('status.free', { size: formatBytes(space.free) }) : ''
 }
 
 /* ========== file operations ========== */

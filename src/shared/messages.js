@@ -52,6 +52,10 @@ const MESSAGES = {
     'count.items.one': '{n} item',
     'count.items.other': '{n} items',
     'count.empty': 'empty',
+    'status.selected.one': '{n} selected',
+    'status.selected.other': '{n} selected',
+    'status.computing': 'calculating…',
+    'status.free': '{size} available',
 
     'places.favorites': 'Favorites',
     'places.pc': 'This PC',
@@ -168,6 +172,10 @@ const MESSAGES = {
     'count.items.one': '{n} elemento',
     'count.items.other': '{n} elementi',
     'count.empty': 'vuota',
+    'status.selected.one': '{n} selezionato',
+    'status.selected.other': '{n} selezionati',
+    'status.computing': 'calcolo…',
+    'status.free': '{size} disponibili',
 
     'places.favorites': 'Preferiti',
     'places.pc': 'Questo PC',

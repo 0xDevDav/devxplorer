@@ -53,6 +53,7 @@ async function describe(p) {
     path: p,
     isDir: stat.isDirectory(),
     mtime: stat.mtimeMs,
+    size: stat.isDirectory() ? 0 : stat.size,
     type: IMAGE_EXT.test(name) ? 'img' : VIDEO_EXT.test(name) ? 'video' : 'file',
     meta: await library.metaFor(p, stat).catch(() => null),
   }
@@ -65,6 +66,20 @@ let t = translator('en')
 let appearance = null
 let watcher = null
 let watchTimer = null
+
+const FOLDER_SIZE_TTL = 60000
+const folderSizes = new Map()
+
+async function walkSize(dir) {
+  const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => [])
+  const sizes = await Promise.all(entries.map(async entry => {
+    if (entry.isSymbolicLink()) return 0
+    const p = path.join(dir, entry.name)
+    if (entry.isDirectory()) return walkSize(p)
+    return (await fsp.stat(p).catch(() => null))?.size ?? 0
+  }))
+  return sizes.reduce((sum, size) => sum + size, 0)
+}
 
 const libraryFilter = () => [{ name: t('library.fileType'), extensions: ['db'] }]
 
@@ -94,6 +109,21 @@ const handlers = {
   },
 
   items: async paths => (await Promise.all(paths.map(describe))).filter(Boolean),
+
+  // Recursive size of a folder, cached for a minute because large trees take a while to walk.
+  folderSize(dir) {
+    const key = lower(dir)
+    const cached = folderSizes.get(key)
+    if (cached && Date.now() - cached.at < FOLDER_SIZE_TTL) return cached.size
+    const size = walkSize(dir)
+    folderSizes.set(key, { at: Date.now(), size })
+    return size
+  },
+
+  async diskSpace(p) {
+    const s = await fsp.statfs(path.parse(p).root).catch(() => null)
+    return s && { free: s.bavail * s.bsize, total: s.blocks * s.bsize }
+  },
 
   annotated: async () => (await Promise.all(library.knownLocations().map(describe))).filter(i => i?.meta),
 

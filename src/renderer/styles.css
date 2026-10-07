@@ -108,8 +108,8 @@ body {
   overflow: hidden;
   user-select: none;
   display: grid;
-  grid-template-rows: 40px 48px 46px 1fr;
-  grid-template-areas: "titlebar" "toolbar" "places" "main";
+  grid-template-rows: 40px 48px 46px 1fr 28px;
+  grid-template-areas: "titlebar" "toolbar" "places" "main" "status";
   background: var(--bg);
   color: var(--text);
   font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -133,6 +133,8 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 :root.glass body { background: transparent }
 :root.glass #main { background: var(--bg) }
 :root.glass #toolbar, :root.glass .tab.on { background: color-mix(in srgb, var(--panel) 55%, transparent) }
+#status { grid-area: status; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); font-variant-numeric: tabular-nums }
+:root.glass #status { background: color-mix(in srgb, var(--bg) 40%, transparent) }
 :root.glass #places { background: color-mix(in srgb, var(--bg) 40%, transparent) }
 
 /* ---------- title bar with tabs ---------- */
