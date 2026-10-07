@@ -74,6 +74,8 @@ const MESSAGES = {
 
     'folder.here': 'Files in this folder',
     'folder.empty': 'Empty folder',
+    'folder.denied': 'You do not have access to this folder',
+    'folder.deniedHint': 'Windows does not allow its contents to be shown with your current permissions.',
     'folder.open': 'Open',
     'folder.newPrompt': 'Name of the new folder',
     'folder.newDefault': 'New folder',
@@ -292,6 +294,8 @@ const MESSAGES = {
 
     'folder.here': 'File in questa cartella',
     'folder.empty': 'Cartella vuota',
+    'folder.denied': 'Non hai accesso a questa cartella',
+    'folder.deniedHint': 'Windows non permette di mostrarne il contenuto con i permessi attuali.',
     'folder.open': 'Apri',
     'folder.newPrompt': 'Nome della nuova cartella',
     'folder.newDefault': 'Nuova cartella',

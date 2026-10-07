@@ -299,7 +299,17 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 #main { grid-area: main; display: flex; min-width: 0; min-height: 0 }
 #content { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 60px }
 #content > .hint { margin: 0 4px 12px }
-.empty { margin-top: 80px; text-align: center; color: var(--muted) }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 90px; text-align: center; color: var(--muted) }
+.empty .icon { width: 44px; height: 44px; margin-bottom: 6px; color: var(--faint) }
+.empty-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-soft) }
+.empty .hint { max-width: 380px }
+
+/* Alert sheet: app icon, message and a single default button, like a macOS alert */
+#alert { width: 300px; padding: 22px 20px 16px; text-align: center }
+.alert-icon { width: 56px; height: 56px }
+#alertText { margin: 12px 0 0; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; white-space: pre-line }
+#alert menu { justify-content: stretch }
+#alert menu button { flex: 1 }
 
 /* folder list on the left of the content pane */
 /* width follows the collage size unless the user drags the splitter (then --folders-width is set) */

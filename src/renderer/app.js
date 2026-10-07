@@ -62,6 +62,7 @@ const ICONS = {
   extensions: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/>',
   keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M8 14h8"/>',
   library: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
   gear: '<path d="M19.23 10.41L21.53 10.87L21.53 13.13L19.23 13.59L18.23 15.99L19.54 17.94L17.94 19.54L15.99 18.23L13.59 19.23L13.13 21.53L10.87 21.53L10.41 19.23L8.01 18.23L6.06 19.54L4.46 17.94L5.77 15.99L4.77 13.59L2.47 13.13L2.47 10.87L4.77 10.41L5.77 8.01L4.46 6.06L6.06 4.46L8.01 5.77L10.41 4.77L10.87 2.47L13.13 2.47L13.59 4.77L15.99 5.77L17.94 4.46L19.54 6.06L18.23 8.01Z"/><circle cx="12" cy="12" r="3"/>',
   play: '<path fill="currentColor" stroke="none" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',
   pause: '<rect fill="currentColor" stroke="none" x="6.5" y="5" width="4" height="14" rx="1.2"/><rect fill="currentColor" stroke="none" x="13.5" y="5" width="4" height="14" rx="1.2"/>',
@@ -173,14 +174,24 @@ async function attachPhotoDates(files) {
   photos.forEach((f, i) => { f.taken = dates[i] ?? null })
 }
 
-// kind: "error" (default, used for failures reported by the main process) or "info"
+/*
+ * kind "error" (the default, used for failures reported by the main process) opens an alert sheet
+ * that stays until dismissed, as on macOS; "info" is a brief confirmation at the bottom.
+ */
 function toast(message, kind = 'error') {
+  if (kind === 'error') return showAlert(message)
   const box = $('#toast')
   box.textContent = message
   box.className = kind
   box.hidden = false
   clearTimeout(toast.timer)
   toast.timer = setTimeout(() => { box.hidden = true }, 4000)
+}
+
+function showAlert(message) {
+  const sheet = $('#alert')
+  $('#alertText').textContent = message
+  if (!sheet.open) sheet.showModal()
 }
 
 const sorted = items => items.sort(state.sort === 'date' ? (a, b) => fileDate(b) - fileDate(a) : byName)
@@ -588,7 +599,7 @@ async function render() {
     $('#folders').hidden = true
     showContent(null, [
       el('p', 'hint', t('filter.results', { items: t.n('count.items', count) })),
-      count ? grid(folders, files, null) : el('p', 'empty', t('filter.none')),
+      count ? grid(folders, files, null) : emptyState('search', t('filter.none')),
     ])
   } else {
     const data = await list(state.cwd)
@@ -664,9 +675,19 @@ async function renderPane(entry, data) {
 
   showContent(entry.path, [
     head,
-    folders.length || files.length ? grid(folders, files, entry.path) : el('p', 'empty', t('folder.empty')),
+    folders.length || files.length ? grid(folders, files, entry.path)
+      : data.denied ? emptyState('lock', t('folder.denied'), t('folder.deniedHint'))
+      : emptyState('folderFill', t('folder.empty')),
   ])
   paintSelection()
+}
+
+// A centred icon with a title and an optional explanation, for folders with nothing to show.
+function emptyState(iconName, title, hint) {
+  const node = el('div', 'empty')
+  node.append(icon(iconName), el('p', 'empty-title', title))
+  if (hint) node.append(el('p', 'hint', hint))
+  return node
 }
 
 function showContent(path, nodes) {
