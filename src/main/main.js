@@ -187,6 +187,13 @@ const handlers = {
     } catch { return null }
   },
 
+  // Whole file as bytes, or null when it is larger than max (used for 3D models).
+  async readBinary(p, max) {
+    const stat = await fsp.stat(p).catch(() => null)
+    if (!stat || stat.size > max) return null
+    return fsp.readFile(p)
+  },
+
   // Returns the file content when it looks like text (no NUL bytes), otherwise null.
   // The byte order mark some Windows editors write is dropped so parsers see the first line intact.
   async readText(p, max = 4000) {

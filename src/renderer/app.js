@@ -362,6 +362,7 @@ async function importLibrary() {
 // Images and videos use shell thumbnails; other files show their text or a document icon.
 async function loadPreview(path, type) {
   if (type !== 'file') return { img: await call('thumb', path) }
+  if (MESH_EXT.test(path)) return { img: await meshThumbnail(path) }
   const text = await call('readText', path)
   return text != null ? { text } : {}
 }
@@ -1050,12 +1051,55 @@ function closeViewer() {
   const box = $('#viewer')
   box.classList.remove('show')
   box.querySelector('video')?.pause()
+  disposeMeshView()
   syncWindowControls()
   // Content is dropped only after the fade-out, unless the viewer was reopened meanwhile.
   setTimeout(() => { if (!viewerOpen()) box.replaceChildren() }, FADE_MS)
 }
 
+/* 3D models: loaded through the main process, shown with the WebGL viewer and their size. */
+let activeMeshView = null
+
+function disposeMeshView() {
+  activeMeshView?.dispose()
+  activeMeshView = null
+}
+
+async function openMeshPreview(container, file, isCurrent) {
+  const status = el('div', 'mesh-status', t('mesh.loading'))
+  container.append(status)
+  try {
+    const bytes = await call('readBinary', file.path, MESH_VIEW_LIMIT)
+    if (!isCurrent()) return
+    if (!bytes) return void (status.textContent = t('mesh.tooLarge'))
+    const mesh = await parseMesh(file.name, bytes)
+    if (!isCurrent()) return
+    // e.g. a compiler ".obj" object file: not a model, so show the generic file view instead
+    if (!mesh.positions.length) return container.replaceWith(otherView(file))
+    status.remove()
+    disposeMeshView()
+    activeMeshView = createMeshView(container, mesh)
+    const { triangles, size, units } = activeMeshView.prepared
+    const dimensions = size.map(v => sizeFormat.format(v)).join(' × ') + (units ? ' ' + units : '')
+    container.append(el('div', 'mesh-caption', t('mesh.stats', { triangles: integerFormat.format(triangles), size: dimensions })))
+  } catch {
+    if (isCurrent()) status.textContent = t('mesh.failed')
+  }
+}
+
+const integerFormat = new Intl.NumberFormat(language)
+
+// Files without a preview: document icon, name and a button to open them in their program.
+function otherView(file) {
+  const view = el('div', 'other')
+  const open = el('button', 'primary', t('viewer.openWith'))
+  open.onclick = () => call('open', file.path)
+  view.append(docIcon(file.name, 'large'), el('div', 'name', file.name), open)
+  return view
+}
+
 function showViewer() {
+  disposeMeshView()
   const box = $('#viewer')
   const file = viewer.items[viewer.index]
   const isCurrent = () => viewer.items[viewer.index] === file
@@ -1070,15 +1114,15 @@ function showViewer() {
     else media.src = fileUrl(file.path)
   } else if (/\.pdf$/i.test(file.path)) {
     media = Object.assign(el('iframe', 'doc'), { src: fileUrl(file.path) })
+  } else if (MESH_EXT.test(file.name)) {
+    media = el('div', 'mesh-view')
+    openMeshPreview(media, file, isCurrent)
   } else {
     media = el('div', 'other')
     richPreview(file).then(preview => {
       if (!isCurrent()) return
       if (preview?.bare) return media.replaceWith(preview.node)
-      if (preview) return media.replaceWith(richPreviewFrame(preview))
-      const open = el('button', 'primary', t('viewer.openWith'))
-      open.onclick = () => call('open', file.path)
-      media.append(docIcon(file.name, 'large'), el('div', 'name', file.name), open)
+      media.replaceWith(preview ? richPreviewFrame(preview) : otherView(file))
     })
   }
 
@@ -1087,6 +1131,7 @@ function showViewer() {
   const hints = [
     t('viewer.hint.browse'),
     ...(zoomable ? [t('viewer.hint.zoom')] : []),
+    ...(MESH_EXT.test(file.name) ? [t('viewer.hint.orbit')] : []),
     ...(transparent ? [t('viewer.hint.matte')] : []),
     t('viewer.hint.info'),
     ...activeExtensions().map(x => x.viewer?.hint).filter(Boolean),

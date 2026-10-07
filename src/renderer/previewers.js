@@ -16,7 +16,8 @@ const KEYWORDS = new Set((
   'export extends false final finally fn for from func function go if impl implements import in instanceof ' +
   'interface is lambda let match mut new nil none not null of or package private protected pub public raise ' +
   'return self static struct super switch this throw true try type typeof undefined use var void where while ' +
-  'with yield select insert update delete into values create table join on group order by limit param'
+  'with yield select insert update delete into values create table join on group order by limit param ' +
+  'module include'
 ).split(' '))
 
 const escapeHtml = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
@@ -241,9 +242,11 @@ async function richPreview(file) {
   }
   if (ext === 'svg') return { node: Object.assign(el('img'), { src: fileUrl(file.path) }), bare: true }
 
-  const text = await call('readText', file.path, PREVIEW_TEXT_LIMIT)
-  if (text == null) return null
-  const truncated = text.length >= PREVIEW_TEXT_LIMIT
+  const raw = await call('readText', file.path, PREVIEW_TEXT_LIMIT)
+  if (raw == null) return null
+  const truncated = raw.length >= PREVIEW_TEXT_LIMIT
+  // CRLF and lone CR (classic Mac) line breaks become \n, so line numbers match what is rendered
+  const text = raw.replace(/\r\n?/g, '\n')
 
   if (ext === 'csv' || ext === 'tsv') return csvTable(text, ext, truncated)
   if (ext === 'json') return { node: codeView(prettyJson(text), 'json') }
