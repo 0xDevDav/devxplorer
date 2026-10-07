@@ -30,8 +30,8 @@
   --text-label: #bdbdc8;
   --muted: #8c8c99;
   --faint: #55555f;
-  --accent-soft: #8b7bff26;
-  --accent-faint: #8b7bff14;
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-faint: color-mix(in srgb, var(--accent) 9%, transparent);
   --hover: #ffffff08;
   --hover-strong: #ffffff12;
   --scrollbar: #2a2a33;
@@ -66,8 +66,8 @@
   --text-label: #4a4a55;
   --muted: #6c6c78;
   --faint: #a6a6b1;
-  --accent-soft: #6d5dfc1f;
-  --accent-faint: #6d5dfc12;
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --accent-faint: color-mix(in srgb, var(--accent) 7%, transparent);
   --hover: #0000000a;
   --hover-strong: #00000010;
   --scrollbar: #c8c8d1;
@@ -471,6 +471,11 @@ dialog .actions button { padding: 7px 14px; background: var(--bg); border: 1px s
 dialog .actions button:hover { border-color: var(--muted) }
 
 #settings { width: 520px }
+
+.swatches { display: flex; gap: 10px; margin-top: 14px }
+.swatch { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--swatch); cursor: pointer; box-shadow: inset 0 0 0 1px #00000026; transition: transform var(--fast) var(--ease), box-shadow var(--fast) }
+.swatch:hover { transform: scale(1.1) }
+.swatch.on { box-shadow: inset 0 0 0 1px #00000026, 0 0 0 2px var(--panel), 0 0 0 4px var(--swatch) }
 
 .segmented { display: inline-flex; gap: 2px; margin-top: 10px; padding: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px }
 .segmented button { padding: 6px 16px; background: none; border: 0; border-radius: 7px; color: var(--muted); cursor: pointer }

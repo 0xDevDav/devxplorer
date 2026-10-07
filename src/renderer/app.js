@@ -193,10 +193,44 @@ const THEMES = [['system', 'Sistema'], ['light', 'Chiaro'], ['dark', 'Scuro']]
 const systemDark = matchMedia('(prefers-color-scheme: dark)')
 const themePreference = () => localStorage.theme || 'system'
 
+// macOS accent colors: [id, label, dark appearance, light appearance, text on accent]
+const ACCENTS = [
+  ['violet', 'Viola', '#8b7bff', '#6d5dfc', '#fff'],
+  ['blue', 'Blu', '#0a84ff', '#007aff', '#fff'],
+  ['pink', 'Rosa', '#ff375f', '#ff2d55', '#fff'],
+  ['red', 'Rosso', '#ff453a', '#ff3b30', '#fff'],
+  ['orange', 'Arancione', '#ff9f0a', '#f08c00', '#fff'],
+  ['yellow', 'Giallo', '#ffd60a', '#e6b800', '#1b1b22'],
+  ['green', 'Verde', '#30d158', '#28a745', '#fff'],
+  ['graphite', 'Grafite', '#98989d', '#8e8e93', '#fff'],
+]
+const currentAccent = () => ACCENTS.find(a => a[0] === localStorage.accent) || ACCENTS[0]
+const resolvedTheme = () => themePreference() === 'system' ? (systemDark.matches ? 'dark' : 'light') : themePreference()
+
 function applyTheme() {
-  const preference = themePreference()
-  document.documentElement.dataset.theme = preference === 'system' ? (systemDark.matches ? 'dark' : 'light') : preference
+  const root = document.documentElement
+  const theme = resolvedTheme()
+  const [, , dark, light, onAccent] = currentAccent()
+  root.dataset.theme = theme
+  root.style.setProperty('--accent', theme === 'dark' ? dark : light)
+  root.style.setProperty('--on-accent', onAccent)
   if (!viewerOpen()) syncWindowControls()
+}
+
+function renderAccentPicker() {
+  const theme = resolvedTheme()
+  $('#accentPicker').replaceChildren(...ACCENTS.map(([id, label, dark, light]) => {
+    const b = el('button', 'swatch' + (currentAccent()[0] === id ? ' on' : ''))
+    b.type = 'button'
+    b.title = label
+    b.style.setProperty('--swatch', theme === 'dark' ? dark : light)
+    b.onclick = () => {
+      localStorage.accent = id
+      applyTheme()
+      renderAccentPicker()
+    }
+    return b
+  }))
 }
 
 // The native window controls are drawn by Windows and must be recolored to match the theme.
@@ -217,6 +251,7 @@ function renderThemePicker() {
       localStorage.theme = value
       applyTheme()
       renderThemePicker()
+      renderAccentPicker()
     }
     return b
   }))
@@ -226,6 +261,7 @@ function renderThemePicker() {
 
 function openSettings() {
   renderThemePicker()
+  renderAccentPicker()
   $('#extList').replaceChildren(...extensions.map(x => {
     const row = el('label', 'ext-row')
     const toggle = Object.assign(el('input'), { type: 'checkbox', checked: activeExtensions().includes(x) })
