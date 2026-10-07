@@ -49,6 +49,7 @@
   --c-pink: #ff375f;
   --c-teal: #64d2ff;
   --c-gray: #98989d;
+  --folder: color-mix(in srgb, var(--accent) 78%, #ffffff);
 }
 
 :root[data-theme="light"] {
@@ -84,6 +85,7 @@
   --c-pink: #ff2d55;
   --c-teal: #1ea8d8;
   --c-gray: #8e8e93;
+  --folder: color-mix(in srgb, var(--accent) 72%, #ffffff);
 }
 
 @keyframes fade-in { from { opacity: 0 } }
@@ -163,10 +165,10 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 .tab:hover { background: var(--hover); color: var(--text) }
 .tab.on { background: var(--panel); color: var(--text) }
 .tab span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.tab button { flex: none; width: 20px; height: 20px; padding: 0; background: none; border: 0; border-radius: 5px; color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; cursor: pointer }
+.tab button { flex: none; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; background: none; border: 0; border-radius: 5px; color: var(--muted); font-size: 15px; line-height: 1; opacity: 0; cursor: pointer }
 .tab:hover button, .tab.on button { opacity: 1 }
 .tab button:hover { background: var(--hover-strong); color: var(--text) }
-.new-tab { -webkit-app-region: no-drag; align-self: center; width: 28px; height: 28px; margin-left: 4px; background: none; border: 0; border-radius: 7px; color: var(--muted); font-size: 18px; cursor: pointer }
+.new-tab { -webkit-app-region: no-drag; align-self: center; display: grid; place-items: center; width: 28px; height: 28px; margin-left: 4px; background: none; border: 0; border-radius: 7px; color: var(--muted); font-size: 18px; cursor: pointer }
 .new-tab:hover { background: var(--hover-strong); color: var(--text) }
 
 /* ---------- toolbar ---------- */
@@ -177,12 +179,12 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 #crumbs button { padding: 4px 8px; background: none; border: 0; border-radius: 6px; color: var(--muted); white-space: nowrap; cursor: pointer }
 #crumbs button:last-of-type { color: var(--text); font-weight: 600 }
 #crumbs button:hover { background: var(--panel2); color: var(--text) }
-.sep { color: var(--faint) }
+#crumbs .sep { width: 12px; height: 12px; color: var(--faint) }
 
 #q, #sort, #group { padding: 5px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; outline: none; transition: border-color var(--fast) }
 #q { width: 220px }
 #q:focus { border-color: var(--accent) }
-#settingsBtn { width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer }
+#settingsBtn { display: grid; place-items: center; width: 32px; height: 30px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); font-size: 16px; cursor: pointer }
 #settingsBtn:hover { background: var(--panel2); border-color: var(--line); color: var(--text) }
 
 /* ---------- places bar: favorites, drives, extension filters ---------- */
@@ -209,6 +211,43 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 
 .icon { flex: none; display: inline-flex; width: 17px; height: 17px }
 .icon svg { width: 100%; height: 100%; overflow: visible }
+.tab .icon { width: 13px; height: 13px }
+.new-tab .icon { width: 16px; height: 16px }
+#settingsBtn .icon { width: 18px; height: 18px }
+#menu .check { width: 14px; height: 14px; color: inherit }
+
+/* document icon: page with a folded corner and a colored type label */
+.doc { container-type: size; display: grid; place-items: center; width: 100%; height: 100%; background: var(--panel2) }
+.doc .page {
+  position: relative;
+  height: 64%;
+  aspect-ratio: .78;
+  background: linear-gradient(#ffffff, #eeeef2);
+  border-radius: 3cqh;
+  clip-path: polygon(0 0, 70% 0, 100% 23%, 100% 100%, 0 100%);
+  filter: drop-shadow(0 1px 1px #0003);
+}
+.doc .page::before { content: ""; position: absolute; top: 0; right: 0; width: 30%; height: 23%; background: #d4d4dc; border-bottom-left-radius: 2cqh }
+.doc .page span {
+  position: absolute;
+  left: 50%;
+  bottom: 13%;
+  transform: translateX(-50%);
+  padding: .25em .55em;
+  border-radius: .35em;
+  font: 700 7cqh/1 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  letter-spacing: .02em;
+  color: #fff;
+  background: var(--doc, #8e8e93);
+}
+.doc-pdf { --doc: #e5484d }
+.doc-word { --doc: #2b6cde }
+.doc-sheet { --doc: #1f9d55 }
+.doc-slides { --doc: #e8730c }
+.doc-archive { --doc: #8d6e63 }
+.doc-audio { --doc: #ff2d55 }
+.doc-app { --doc: #5b6b7f }
+.doc.large { width: 180px; height: 220px; background: none }
 .icon-desktop { color: var(--c-blue) }
 .icon-downloads { color: var(--c-green) }
 .icon-documents { color: var(--c-orange) }
@@ -261,17 +300,9 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 }
 .collage > :only-child { grid-area: 1 / 1 / 3 / 3 }
 .collage img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover }
-.collage img.icon { object-fit: contain; padding: 2px }
 .collage .paper { padding: 2px; font-size: 2px }
-/* folders without files show a folder glyph; flex keeps the glyph's size relative to a definite box */
-.collage.no-files { display: flex; align-items: center; justify-content: center }
-.collage.no-files::after {
-  content: "";
-  width: 46%;
-  aspect-ratio: 1;
-  background: var(--placeholder);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 7a2 2 0 0 1 2-2h4.2l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
+/* folders without files show a Finder-style folder tinted with the accent color */
+.finder-folder { place-self: center; grid-area: 1 / 1 / 3 / 3; width: 62%; height: 62%; color: var(--folder) }
 
 .pane-head { display: flex; align-items: center; gap: 12px; margin: 0 4px 14px }
 .pane-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; min-width: 0 }
@@ -301,7 +332,7 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 .group-head:hover { color: var(--text) }
 .group-head small { font-weight: 400; color: var(--muted) }
 .group-head::after { content: ""; flex: 1; height: 1px; margin-left: 6px; background: var(--line) }
-.group-head .chev { width: 12px; font-size: 14px; line-height: 1; text-align: center; color: var(--muted); transform: rotate(90deg); transition: transform var(--normal) var(--ease) }
+.group-head .chev { width: 12px; height: 12px; color: var(--muted); transform: rotate(90deg); transition: transform var(--normal) var(--ease) }
 .group-head.collapsed .chev { transform: none }
 
 /* collapsing animates the row track from its content height to zero */
@@ -319,7 +350,6 @@ button, .frow, .item, .chip, .tab, #toolbar, #places, #folders {
 
 .thumb { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 9px; background: var(--panel2) }
 .thumb img { display: block; width: 100%; height: 100%; object-fit: cover }
-.thumb img.icon { object-fit: none }
 .thumb .badges { position: absolute; top: 6px; left: 6px; right: 6px }
 img:not([src]) { visibility: hidden }
 img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
@@ -339,7 +369,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
 }
 .paper:not(.instant) { animation: fade-in var(--normal) ease-out }
 
-.play { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 10px; color: #fff; background: #000a; backdrop-filter: blur(6px) }
+.thumb .play { position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px; padding: 7px 6px 7px 8px; border-radius: 50%; color: #fff; background: #0009; backdrop-filter: blur(6px) }
 .badges { display: flex; flex-wrap: wrap; gap: 4px }
 .pill { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #111 }
 .tag { padding: 1px 7px; border-radius: 999px; font-size: 11px; color: #eee; background: #000a; backdrop-filter: blur(6px) }
@@ -406,7 +436,7 @@ img[src]:not(.instant) { animation: fade-in var(--normal) ease-out }
   user-select: text;
 }
 #viewer .other { display: flex; flex-direction: column; align-items: center; gap: 14px }
-#viewer .other img { width: 64px; height: 64px }
+
 #viewer .other .name { font-size: 15px; color: #ececf1 }
 #viewer .other button { padding: 8px 16px; border: 1px solid #26262f; border-radius: 8px; cursor: pointer }
 .viewer-bar { position: absolute; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; gap: 12px; color: #ddd }

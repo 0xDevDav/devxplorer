@@ -24,6 +24,59 @@ const collator = new Intl.Collator('it', { numeric: true, sensitivity: 'base' })
 const byName = (a, b) => collator.compare(a.name, b.name)
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
 
+/* ========== icons ========== */
+
+// Outline icons on a 24x24 grid, drawn with currentColor so CSS sets their color.
+const ICONS = {
+  desktop: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  downloads: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  documents: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+  pictures: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+  videos: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3z"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
+  chevron: '<path d="m9 6 6 6-6 6"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  gear: '<path d="M19.23 10.41L21.53 10.87L21.53 13.13L19.23 13.59L18.23 15.99L19.54 17.94L17.94 19.54L15.99 18.23L13.59 19.23L13.13 21.53L10.87 21.53L10.41 19.23L8.01 18.23L6.06 19.54L4.46 17.94L5.77 15.99L4.77 13.59L2.47 13.13L2.47 10.87L4.77 10.41L5.77 8.01L4.46 6.06L6.06 4.46L8.01 5.77L10.41 4.77L10.87 2.47L13.13 2.47L13.59 4.77L15.99 5.77L17.94 4.46L19.54 6.06L18.23 8.01Z"/><circle cx="12" cy="12" r="3"/>',
+  play: '<path fill="currentColor" stroke="none" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',
+  // two-tone filled folder in the style of the Finder
+  folderFill: '<path fill="currentColor" stroke="none" opacity=".6" d="M2 6.5A2.5 2.5 0 0 1 4.5 4h4.4l2 2h8.6A2.5 2.5 0 0 1 22 8.5V10H2z"/><path fill="currentColor" stroke="none" d="M2 9h20v9.5a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 18.5z"/>',
+}
+
+function icon(name, cls = '') {
+  const node = el('span', `icon icon-${name} ${cls}`.trim())
+  node.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`
+  return node
+}
+
+/*
+ * Files without a preview show a document icon in the style of macOS: a page with a folded
+ * corner and a label in the color of the file family.
+ */
+const DOC_KINDS = [
+  ['pdf', /^pdf$/],
+  ['word', /^(docx?|odt|rtf|pages)$/],
+  ['sheet', /^(xlsx?|ods|numbers)$/],
+  ['slides', /^(pptx?|odp|key)$/],
+  ['archive', /^(zip|rar|7z|tar|gz|bz2|xz)$/],
+  ['audio', /^(mp3|wav|flac|m4a|aac|ogg|opus)$/],
+  ['app', /^(exe|msi|bat|cmd|ps1|lnk|url|appx|msix)$/],
+]
+
+function docIcon(name, cls = '') {
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
+  const kind = DOC_KINDS.find(([, test]) => test.test(ext))?.[0] || 'other'
+  const node = el('div', `doc doc-${kind} ${cls}`.trim())
+  const page = el('div', 'page')
+  page.append(el('span', '', (ext || 'file').slice(0, 4).toUpperCase()))
+  node.append(page)
+  return node
+}
+
 /* ========== state ========== */
 
 const state = {
@@ -204,13 +257,11 @@ async function importLibrary() {
 
 /* ========== previews ========== */
 
-// Generic files: text excerpt first, then the shell thumbnail, then the associated program icon.
+// Images and videos use shell thumbnails; other files show their text or a document icon.
 async function loadPreview(path, type) {
   if (type !== 'file') return { img: await call('thumb', path) }
   const text = await call('readText', path)
-  if (text != null) return { text }
-  const img = await call('thumb', path)
-  return img ? { img } : { icon: await call('icon', path) }
+  return text != null ? { text } : {}
 }
 
 const previews = new Map()
@@ -228,7 +279,7 @@ const previewObserver = new IntersectionObserver(entries => entries.forEach(asyn
   let node = img
   if (preview.text != null) img.replaceWith(node = el('div', 'paper', preview.text.slice(0, 600)))
   else if (preview.img) img.src = preview.img
-  else if (preview.icon) { img.src = preview.icon; img.classList.add('icon') }
+  else img.replaceWith(node = docIcon(baseName(img.dataset.src)))
   if (instant) node.classList.add('instant')
 }))
 
@@ -251,7 +302,7 @@ async function fillFolderPreview(path, collage, countEl, filesOnly = false) {
   countEl.textContent = filesOnly ? `${data.files.length} file` : countLabel(data)
   const files = sorted(data.files).slice(0, 4)
   if (files.length) collage.append(...files.map(previewImg))
-  else collage.classList.add('no-files')
+  else collage.replaceChildren(icon('folderFill', 'finder-folder'))
 }
 
 /* ========== main view: folder list + content pane ========== */
@@ -443,7 +494,7 @@ function groupSection(label, count, content) {
   const head = el('div', 'group-head')
   const body = el('div', 'group-body')
   const inner = el('div')
-  head.append(el('span', 'chev', '›'), el('span', '', label), el('small', '', count))
+  head.append(icon('chevron', 'chev'), el('span', '', label), el('small', '', count))
   inner.append(content)
   body.append(inner)
   const apply = () => {
@@ -525,7 +576,7 @@ function fileCard(file, siblings) {
   const card = el('div', 'item' + (dimmed(file.path) ? ' dim' : ''))
   const thumb = el('div', 'thumb')
   thumb.append(previewImg(file), badges(file.path))
-  if (file.type === 'video') thumb.append(el('span', 'play', '▶'))
+  if (file.type === 'video') thumb.append(icon('play', 'play'))
   card.append(thumb, el('div', 'name', file.name))
   card.title = file.path
   selectable(card, file.path, false)
@@ -703,7 +754,7 @@ function showMenu(e, items) {
     const b = el('button', item.danger ? 'danger' : '')
     if (item.dot) b.append(el('i', 'dot ' + item.dot))
     b.append(el('span', '', item.label))
-    if (item.check) b.append(el('b', '', '✓'))
+    if (item.check) b.append(icon('check', 'check'))
     if (item.key) b.append(el('kbd', '', item.key))
     b.onclick = () => { menu.hidden = true; item.run() }
     menu.append(b)
@@ -790,10 +841,9 @@ function showViewer() {
     call('readText', file.path, 500000).then(async text => {
       if (!isCurrent()) return
       if (text != null) return media.replaceWith(el('pre', 'textview', text))
-      const icon = Object.assign(el('img'), { src: (await call('icon', file.path)) || '' })
       const open = el('button', 'primary', 'Apri con il programma predefinito')
       open.onclick = () => call('open', file.path)
-      media.append(icon, el('div', 'name', file.name), open)
+      media.append(docIcon(file.name, 'large'), el('div', 'name', file.name), open)
     })
   }
 
@@ -816,23 +866,6 @@ function viewerKey(e) {
 }
 
 /* ========== places bar: favorites, drives, extension filters ========== */
-
-// Outline icons on a 24x24 grid, drawn with currentColor so CSS sets their color.
-const ICONS = {
-  desktop: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
-  downloads: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
-  documents: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
-  pictures: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
-  videos: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3z"/>',
-  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-  drive: '<rect x="2" y="13" width="20" height="7" rx="2"/><path d="M5 13 7.5 5h9L19 13M17 16.5h.01"/>',
-}
-
-function icon(name) {
-  const node = el('span', 'icon icon-' + name)
-  node.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`
-  return node
-}
 
 function placeButton(dir, name, kind) {
   const b = el('button', 'place' + (samePath(dir, state.cwd) ? ' active' : ''))
@@ -878,7 +911,8 @@ function renderTabs() {
   const strip = $('#tabs')
   strip.replaceChildren(...tabs.map((tab, i) => {
     const node = el('div', 'tab' + (i === tabIndex ? ' on' : ''))
-    const close = el('button', '', '×')
+    const close = el('button')
+    close.append(icon('close'))
     close.title = 'Chiudi scheda (Ctrl+W)'
     close.onclick = e => { e.stopPropagation(); closeTab(i) }
     node.append(el('span', '', baseName(tab.cwd)), close)
@@ -888,7 +922,8 @@ function renderTabs() {
     dropTarget(node, tab.cwd)
     return node
   }))
-  const add = el('button', 'new-tab', '+')
+  const add = el('button', 'new-tab')
+  add.append(icon('plus'))
   add.title = 'Nuova scheda (Ctrl+T)'
   add.onclick = () => newTab(state.cwd)
   strip.append(add)
@@ -906,7 +941,7 @@ function renderCrumbs() {
     b.onclick = () => navigate(target)
     dropTarget(b, target)
     crumbs.append(b)
-    if (i < parts.length - 1) crumbs.append(el('span', 'sep', '›'))
+    if (i < parts.length - 1) crumbs.append(icon('chevron', 'sep'))
   })
 }
 
@@ -1021,6 +1056,7 @@ function bindEvents() {
     if (e.key === 'Enter') { e.preventDefault(); $('#ask').close('ok') }
   })
   $('#viewer').addEventListener('click', e => { if (e.target.id === 'viewer') closeViewer() })
+  $('#settingsBtn').replaceChildren(icon('gear'))
   $('#settingsBtn').onclick = openSettings
   $('#exportBtn').onclick = exportLibrary
   $('#importBtn').onclick = importLibrary

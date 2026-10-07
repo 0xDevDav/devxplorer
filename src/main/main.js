@@ -125,8 +125,6 @@ const handlers = {
     } catch { return null } finally { await fh?.close() }
   },
 
-  icon: async p => (await app.getFileIcon(p, { size: 'large' }).catch(() => null))?.toDataURL() ?? null,
-
   /*
    * The window controls are painted by Windows above the page, so the renderer recolors them
    * for the theme and the viewer. Theme colors are remembered to open the next window without a flash.
