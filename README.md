@@ -17,9 +17,11 @@
 
 ## Install
 
-Download the installer from the [latest release](https://github.com/0xDevDav/devxplorer/releases/latest) and run it. DevXplorer updates itself from the GitHub releases.
+The easiest way is the Microsoft Store, which installs and updates DevXplorer for you:
 
-Windows may show a SmartScreen warning because the installer is not code-signed: choose "More info" and then "Run anyway".
+<a href="https://apps.microsoft.com/detail/9PLQ6K8L0FT2"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft"></a>
+
+You can also download the installer from the [latest release](https://github.com/0xDevDav/devxplorer/releases/latest). This version updates itself from the GitHub releases and adds "Open in DevXplorer" to the File Explorer menu. Windows may show a SmartScreen warning because the installer is not code-signed: choose "More info" and then "Run anyway".
 
 ## Build from source
 
